@@ -43,6 +43,7 @@ const MENU: TopItem[] = [
       { label: 'Compressor',  icon: '🔊', appId: 'compressor' },
       { label: 'Parametric EQ', icon: '🎚️', appId: 'eq' },
       { label: 'Oscilloscope', icon: '📊', appId: 'oscilloscope' },
+      { label: 'MilkDrop Viz', icon: '🌊', appId: 'milkdrop' },
     ],
   },
   {
@@ -57,7 +58,7 @@ const MENU: TopItem[] = [
     kind: 'category', label: 'Games & Fun', icon: '🎮',
     items: [
       { label: 'SkiFree',    icon: '⛷️', appId: 'ski-free' },
-      { label: 'ScreenMate', icon: '🐑', appId: 'screen-mate' },
+      { label: 'Screen Mate Poo', icon: '🐑', appId: 'screen-mate' },
     ],
   },
   {

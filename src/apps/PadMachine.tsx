@@ -1,8 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { audioEngine } from '../audio/engine';
+import { useOSStore } from '../store';
 import { addUserSample, getUserSampleNames, subscribeUserSamples, userSampleBuffers } from '../store/userSamples';
 
-// ── Sample library (same source as FileBrowser) ──────────────────────────────
+// ── Module-level state — survives component unmount ───────────────────────────
+// Hold sources keep playing even when the app window is closed
+const padHoldSources = new Map<number, AudioBufferSourceNode>();
+// Buffer cache so we don't regenerate on every re-open
+const padBufferCache = new Map<string, AudioBuffer>();
+
+// ── Sample library ────────────────────────────────────────────────────────────
 
 const SAMPLE_LIBRARY = [
   {
@@ -25,8 +32,7 @@ const SAMPLE_LIBRARY = [
   {
     category: '🌊 Loops',
     packs: [
-      { name: 'Drum Loops 128', color: '#ffff00', samples: ['Loop A', 'Loop B', 'Loop C', 'Half-time', 'Broken Beat', 'Shuffle'] },
-      { name: 'Ambient Pads',   color: '#8888ff', samples: ['Pad Warm', 'Pad Cold', 'Drone Atm', 'Space Pad', 'Choir Pad', 'Glass Pad'] },
+      { name: 'Ambient Pads', color: '#8888ff', samples: ['Pad Warm', 'Pad Cold', 'Drone Atm', 'Space Pad', 'Choir Pad', 'Glass Pad'] },
     ],
   },
 ];
@@ -50,9 +56,49 @@ function generateSound(name: string): Promise<AudioBuffer> {
       const f = n.includes(' d') ? 73 : n.includes(' e') ? 82 : 65;
       for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] = (Math.sin(2 * Math.PI * f * t) + 0.5 * Math.sin(4 * Math.PI * f * t)) * Math.exp(-4 * t) * 0.8; }
     } else if (n.includes('pad') || n.includes('drone') || n.includes('atm') || n.includes('choir') || n.includes('glass') || n.includes('space')) {
-      for (let i = 0; i < d.length; i++) { const t = i / sr; const env = Math.min(1, t / 0.15) * Math.exp(-0.5 * t); d[i] = (Math.sin(2 * Math.PI * 110 * t) + 0.5 * Math.sin(2 * Math.PI * 165 * t) + 0.3 * Math.sin(2 * Math.PI * 220 * t)) * env * 0.35; }
-    } else if (n.includes('loop')) {
-      for (let i = 0; i < d.length; i++) { const t = i / sr; const beat = (t * 2) % 0.5; d[i] = (beat < 0.1 ? Math.sin(2 * Math.PI * 120 * Math.exp(-8 * beat) * beat) * Math.exp(-6 * beat) : (Math.random() * 2 - 1) * Math.exp(-15 * (beat - 0.25)) * (beat > 0.2 && beat < 0.3 ? 0.4 : 0.05)); }
+      // 4-second buffer. Every frequency is an exact multiple of 0.25 Hz so all
+      // oscillators complete whole cycles — zero phase gap at the loop point.
+      const padLen = Math.floor(sr * 4);
+      const padBuf = ctx.createBuffer(1, padLen, sr);
+      const pd = padBuf.getChannelData(0);
+      type Osc = { f: number; a: number };
+      let oscs: Osc[] = [];
+      let lfoRate = 0.25, lfoDepth = 0; // LFO rate must also be multiple of 0.25 Hz
+      if (n.includes('warm')) {
+        // Three detuned oscillators beating against each other (0.25–0.5 Hz beat) → slow shimmer
+        oscs = [{ f:110, a:.35 }, { f:109.75, a:.2 }, { f:110.25, a:.2 }, { f:110.5, a:.12 }, { f:220, a:.08 }];
+        lfoRate = 0.25; lfoDepth = 0.04;
+      } else if (n.includes('cold')) {
+        oscs = [{ f:220, a:.25 }, { f:219.75, a:.15 }, { f:220.25, a:.15 }, { f:330, a:.1 }, { f:440, a:.05 }];
+        lfoRate = 0.5; lfoDepth = 0.03;
+      } else if (n.includes('drone')) {
+        oscs = [{ f:55, a:.3 }, { f:110, a:.25 }, { f:109.75, a:.15 }, { f:165, a:.1 }, { f:220, a:.05 }];
+        lfoRate = 0.25; lfoDepth = 0.1;
+      } else if (n.includes('atm')) {
+        oscs = [{ f:82.5, a:.2 }, { f:82.25, a:.15 }, { f:165, a:.12 }, { f:247.5, a:.08 }];
+        lfoRate = 0.5; lfoDepth = 0.06;
+      } else if (n.includes('space')) {
+        // Wide chorus: 5 closely-detuned oscillators spanning ±0.75 Hz
+        oscs = [{ f:165, a:.2 }, { f:164.75, a:.18 }, { f:165.25, a:.18 }, { f:164.5, a:.12 }, { f:165.5, a:.1 }];
+        lfoRate = 0.5; lfoDepth = 0.12;
+      } else if (n.includes('choir')) {
+        oscs = [{ f:220, a:.2 }, { f:220.25, a:.12 }, { f:440, a:.18 }, { f:660, a:.08 }, { f:880, a:.04 }];
+        lfoRate = 0.25; lfoDepth = 0.05;
+      } else { // glass
+        oscs = [{ f:880, a:.2 }, { f:879.75, a:.12 }, { f:880.25, a:.1 }, { f:1320, a:.06 }];
+        lfoRate = 1.0; lfoDepth = 0.08; // 4 complete cycles in 4s
+      }
+      for (let i = 0; i < padLen; i++) {
+        const t = i / sr;
+        let s = 0;
+        for (const o of oscs) s += Math.sin(2 * Math.PI * o.f * t) * o.a;
+        if (lfoDepth > 0) s *= 1 - lfoDepth * 0.5 + lfoDepth * 0.5 * Math.sin(2 * Math.PI * lfoRate * t);
+        pd[i] = s;
+      }
+      // 50ms safety crossfade at loop point (masks any sub-sample rounding)
+      const fl = Math.floor(sr * 0.05);
+      for (let i = 0; i < fl; i++) { const a = i / fl; pd[padLen - fl + i] = pd[padLen - fl + i] * (1 - a) + pd[i] * a; }
+      return resolve(padBuf);
     } else if (n.includes('pluck') || n.includes('bell')) {
       const f2 = 880;
       for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] = Math.sin(2 * Math.PI * f2 * t) * Math.exp(-8 * t) * 0.7; }
@@ -93,32 +139,83 @@ function makePad(idx: number): PadState {
 // ── PadMachine ────────────────────────────────────────────────────────────────
 
 export default function PadMachine() {
-  const [pads, setPads] = useState<PadState[]>(() => Array.from({ length: 16 }, (_, i) => makePad(i)));
+  const { padAssignments, updatePadAssignment } = useOSStore();
+
+  // Init pads from store assignments (buffers are loaded async below)
+  const [pads, setPads] = useState<PadState[]>(() =>
+    padAssignments.map((a, i) => ({
+      ...makePad(i),
+      sampleName: a.sampleName,
+      mode: a.mode,
+      color: a.color || PAD_COLORS[i % PAD_COLORS.length],
+    }))
+  );
+
   const [selectedPad, setSelectedPad] = useState<number | null>(null);
-  const [activePads, setActivePads] = useState<Set<number>>(new Set());
+  // Init activePads from currently-playing hold sources (survived last close)
+  const [activePads, setActivePads] = useState<Set<number>>(() => new Set(padHoldSources.keys()));
   const [expandedPack, setExpandedPack] = useState<string | null>(null);
   const [userSampleNames, setUserSampleNames] = useState<string[]>(() => getUserSampleNames());
-  const holdSources = useRef<Map<number, AudioBufferSourceNode>>(new Map());
   const uploadRef = useRef<HTMLInputElement>(null);
 
-  // Stay in sync when new samples are uploaded (even from other instances)
+  // Stay in sync when new samples are uploaded
   useEffect(() => { return subscribeUserSamples(setUserSampleNames); }, []);
 
+  // On mount: restore buffers for all assigned pads from cache or regenerate
+  useEffect(() => {
+    padAssignments.forEach((assignment, i) => {
+      if (!assignment.sampleName) return;
+      const name = assignment.sampleName;
+      const cached = padBufferCache.get(name) ?? userSampleBuffers.get(name) ?? null;
+      if (cached) {
+        padBufferCache.set(name, cached);
+        setPads(prev => {
+          const next = [...prev];
+          next[i] = { ...next[i], buffer: cached, loading: false };
+          return next;
+        });
+      } else {
+        setPads(prev => { const n2 = [...prev]; n2[i] = { ...n2[i], loading: true }; return n2; });
+        generateSound(name).then(buf => {
+          padBufferCache.set(name, buf);
+          setPads(prev => {
+            const next = [...prev];
+            next[i] = { ...next[i], buffer: buf, loading: false };
+            return next;
+          });
+        });
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const assignSample = useCallback(async (padIdx: number, sampleName: string, color: string, preloadedBuffer?: AudioBuffer) => {
+    const effectiveColor = color || PAD_COLORS[padIdx % PAD_COLORS.length];
     setPads(prev => {
       const next = [...prev];
-      next[padIdx] = { ...next[padIdx], sampleName, loading: !preloadedBuffer, color };
+      next[padIdx] = { ...next[padIdx], sampleName, color: effectiveColor, loading: !preloadedBuffer };
       return next;
     });
+    updatePadAssignment(padIdx, { sampleName, color: effectiveColor });
+
     audioEngine.init();
     if (audioEngine.ctx?.state === 'suspended') audioEngine.ctx.resume();
-    const buffer = preloadedBuffer ?? await generateSound(sampleName);
+
+    let buffer: AudioBuffer;
+    if (preloadedBuffer) {
+      buffer = preloadedBuffer;
+    } else {
+      const cached = padBufferCache.get(sampleName) ?? userSampleBuffers.get(sampleName);
+      buffer = cached ?? await generateSound(sampleName);
+    }
+    padBufferCache.set(sampleName, buffer);
+
     setPads(prev => {
       const next = [...prev];
       next[padIdx] = { ...next[padIdx], buffer, loading: false };
       return next;
     });
-  }, []);
+  }, [updatePadAssignment]);
 
   const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -129,8 +226,9 @@ export default function PadMachine() {
       const arrayBuffer = await file.arrayBuffer();
       try {
         const audioBuffer = await audioEngine.ctx!.decodeAudioData(arrayBuffer);
-        const name = file.name.replace(/\.[^.]+$/, ''); // strip extension
+        const name = file.name.replace(/\.[^.]+$/, '');
         addUserSample(name, audioBuffer);
+        padBufferCache.set(name, audioBuffer);
       } catch {
         console.warn('Could not decode', file.name);
       }
@@ -145,17 +243,13 @@ export default function PadMachine() {
     const ctx = audioEngine.ctx!;
 
     if (pad.mode === 'hold') {
-      const existing = holdSources.current.get(padIdx);
+      const existing = padHoldSources.get(padIdx);
       if (existing) {
-        // Toggle off
-        try {
-          existing.stop();
-        } catch {}
-        holdSources.current.delete(padIdx);
+        try { existing.stop(); } catch {}
+        padHoldSources.delete(padIdx);
         setActivePads(prev => { const s = new Set(prev); s.delete(padIdx); return s; });
         return;
       }
-      // Toggle on — loop
       const src = ctx.createBufferSource();
       src.buffer = pad.buffer;
       src.loop = true;
@@ -164,14 +258,13 @@ export default function PadMachine() {
       src.connect(gain);
       gain.connect(audioEngine.mixerInputs[2] ?? audioEngine.masterGain!);
       src.start();
-      holdSources.current.set(padIdx, src);
+      padHoldSources.set(padIdx, src);
       setActivePads(prev => new Set([...prev, padIdx]));
       src.onended = () => {
-        holdSources.current.delete(padIdx);
+        padHoldSources.delete(padIdx);
         setActivePads(prev => { const s = new Set(prev); s.delete(padIdx); return s; });
       };
     } else {
-      // Oneshot — play once, flash active state
       const src = ctx.createBufferSource();
       src.buffer = pad.buffer;
       const gain = ctx.createGain();
@@ -184,37 +277,31 @@ export default function PadMachine() {
     }
   }, [pads]);
 
-  // Stop all hold sources on unmount
-  useEffect(() => {
-    return () => {
-      holdSources.current.forEach(src => { try { src.stop(); } catch {} });
-    };
-  }, []);
+  // NOTE: no cleanup on unmount — hold pads intentionally keep playing after close
 
   const toggleMode = (padIdx: number) => {
     setPads(prev => {
       const next = [...prev];
       const pad = next[padIdx];
-      // Stop hold if switching away
       if (pad.mode === 'hold') {
-        const src = holdSources.current.get(padIdx);
-        if (src) { try { src.stop(); } catch {} holdSources.current.delete(padIdx); }
+        const src = padHoldSources.get(padIdx);
+        if (src) { try { src.stop(); } catch {} padHoldSources.delete(padIdx); }
         setActivePads(pr => { const s = new Set(pr); s.delete(padIdx); return s; });
       }
-      next[padIdx] = { ...pad, mode: pad.mode === 'oneshot' ? 'hold' : 'oneshot' };
+      const newMode: 'oneshot' | 'hold' = pad.mode === 'oneshot' ? 'hold' : 'oneshot';
+      next[padIdx] = { ...pad, mode: newMode };
+      updatePadAssignment(padIdx, { mode: newMode });
       return next;
     });
   };
 
   const clearPad = (padIdx: number) => {
-    const src = holdSources.current.get(padIdx);
-    if (src) { try { src.stop(); } catch {} holdSources.current.delete(padIdx); }
+    const src = padHoldSources.get(padIdx);
+    if (src) { try { src.stop(); } catch {} padHoldSources.delete(padIdx); }
     setActivePads(prev => { const s = new Set(prev); s.delete(padIdx); return s; });
-    setPads(prev => {
-      const next = [...prev];
-      next[padIdx] = makePad(padIdx);
-      return next;
-    });
+    const def = makePad(padIdx);
+    setPads(prev => { const next = [...prev]; next[padIdx] = def; return next; });
+    updatePadAssignment(padIdx, { sampleName: null, mode: 'oneshot', color: PAD_COLORS[padIdx % PAD_COLORS.length] });
   };
 
   return (
@@ -228,7 +315,7 @@ export default function PadMachine() {
           🎛️ PAD MACHINE
         </div>
         <div style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--px-text-dim)' }}>
-          Click pad to trigger · Hold mode = toggle loop · Drag sample to assign
+          Click pad to trigger · Hold mode = toggle loop · HOLD pads play through app close
         </div>
       </div>
 
@@ -286,7 +373,7 @@ export default function PadMachine() {
                   <div style={{ fontSize: 9, color: 'var(--px-text-dim)' }}>{pad.label}</div>
 
                   {isActive && pad.mode === 'hold' && (
-                    <div style={{ fontSize: 8, color: pad.color, animation: 'none' }}>● PLAYING</div>
+                    <div style={{ fontSize: 8, color: pad.color }}>● PLAYING</div>
                   )}
                 </div>
               );

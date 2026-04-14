@@ -630,15 +630,34 @@ class AudioEngine {
   }
 
   private synthTom(ctx: AudioContext, time: number, vel: number, out: AudioNode, freq: number) {
+    // Main tone — sine with pitch sweep
     const osc = ctx.createOscillator();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, time);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.4, time + 0.3);
+    osc.frequency.setValueAtTime(freq * 1.6, time);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.55, time + 0.15);
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(vel * 1.0, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+    gain.gain.setValueAtTime(vel * 1.8, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+
+    // Punch transient — short noise burst
+    const bufSize = Math.floor(ctx.sampleRate * 0.04);
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const nf = ctx.createBiquadFilter();
+    nf.type = 'bandpass';
+    nf.frequency.value = freq * 2;
+    nf.Q.value = 0.8;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(vel * 0.6, time);
+    ng.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+
     osc.connect(gain); gain.connect(out);
-    osc.start(time); osc.stop(time + 0.35);
+    noise.connect(nf); nf.connect(ng); ng.connect(out);
+    osc.start(time); osc.stop(time + 0.45);
+    noise.start(time); noise.stop(time + 0.05);
   }
 
   private synthCymbal(ctx: AudioContext, time: number, vel: number, out: AudioNode) {

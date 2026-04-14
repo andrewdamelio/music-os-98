@@ -7,38 +7,40 @@ const TOPICS = [
 
 To get started:
 1. Press SPACE to start/stop playback
-2. Double-click desktop icons to open apps
-3. The Beat Machine has a default pattern pre-loaded
-4. Open the SynthStation and play notes with your keyboard
+2. Double-click any desktop icon to open an app
+3. The Beat Machine loads with a default pattern
+4. Open SynthStation and play keys with your computer keyboard
 
 Keyboard shortcuts:
 • SPACE — Play / Stop
-• A W S E D F T G Y H U J K O L P — Piano keyboard (SynthStation focus)
+• A W S E D F T G Y H U J K O L P — Piano keyboard
 • Z / X — Octave down / up
 
-All apps use real Web Audio API synthesis — no samples faked.`,
+All synthesis uses the real Web Audio API.`,
   },
   {
     title: '🥁 Beat Machine',
-    content: `A 16-step drum sequencer with 8 channels of synthetic percussion.
+    content: `16-step drum sequencer with 8 channels of synthesized percussion.
 
 Controls:
-• Click any lit step button to toggle it on/off
-• Click a channel name to preview that drum sound
-• Volume knob on each channel controls level
-• BPM and Swing knobs at the top — drag to adjust
-• Bank A / B buttons switch between two pattern banks
+• Click any step button to toggle on/off
+• Click a channel label to preview that drum sound
+• Drag the volume knob per channel to adjust level
+• BPM knob — drag up/down to change tempo
+• Swing knob — add groove/swing feel
+• Pattern banks A/B/C/D — 4 independent patterns
+• STEPS — switch between 16 and 32 steps
 
-Drum synthesis:
-• Kick: oscillator with exponential pitch/amp decay
-• Snare: noise burst + tuned oscillator body
-• Hi-hat: filtered white noise (short decay)
-• Open Hat: filtered white noise (long decay)
-• Clap: multi-layered noise bursts
-• Toms: pitch-decaying sine waves
+Drum synthesis (all generated, no sample files):
+• Kick: sine oscillator with exponential pitch sweep + transient click
+• Snare: noise + tuned body oscillator
+• Hi-hat: filtered white noise, fast decay
+• Open Hat: filtered white noise, slow decay
+• Clap: multi-burst layered noise
+• Tom Hi/Lo: pitch-sweeping sine with noise punch transient
+• Cymbal: high-pass filtered noise with long tail
 
-Step indicator at the bottom of each column shows the
-current playback position in real time.`,
+Step indicator at the bottom lights with playback position.`,
   },
   {
     title: '🎹 SynthStation',
@@ -55,165 +57,226 @@ Mouse: click keys in the keyboard display
 Keyboard: A W S E D F T G Y H U J K O L P
 Octave: Z (down), X (up) — OCT display shows current octave
 
-Key highlights follow the actual transposed pitch on the keyboard.
-The dot-matrix visualizer shows energy at the note's frequency column.
+Patches:
+• 20 factory patches included: leads, bass, pads, stabs
+• Click any patch to load it instantly
+• "Save Current" — type a name and save your own patches
+• User patches stored in localStorage, persist between sessions
+• User patches shown in purple; click × to delete
 
 Tips:
 • High resonance + filter envelope = classic synth sweeps
-• LFO on filter = autowah / wah-wah effect
-• OSC 2 detune + mix = chorus/fat sound`,
+• LFO on filter = autowah / wah-wah
+• OSC 2 detune + mix = fat chorus sound
+• Siren patch: LFO on pitch for alarm/air raid effect`,
   },
   {
     title: '🎼 Piano Roll',
-    content: `Draw melodic sequences for the SynthStation.
+    content: `Draw melodic sequences that play through SynthStation.
 
-Tools:
-• Draw (pencil): click to place notes
-• Erase: click existing notes to remove
+Drawing:
+• Click an empty cell to place a note
+• Click an existing note to remove it (same tool — no mode switching)
+• Notes snap to the selected SNAP grid automatically
 
-Toolbar options:
-• SNAP — quantize placement (1/32 to 1/4 beat)
-• DUR — note duration (1/32 to 1/2)
-• BARS — loop length (1, 2, 4, 8, or 16 bars)
-• Zoom slider — horizontal zoom
-• Enabled/Disabled — toggle piano roll playback
+Toolbar:
+• SNAP — quantize placement: 1/32, 1/16, 1/8, 1/4 note
+• LENGTH — note duration: 1/32 through 1/2 note
+• BARS — loop length: 1, 2, 4, 8, or 16 bars
+• Zoom — horizontal zoom slider
+• ON/OFF — toggle piano roll playback
+• Clear — remove all notes
 
-The piano roll plays back through the SynthStation (channel 1).
-Click piano keys on the left to audition pitches.
-Playhead shows position during transport playback.`,
+The green playhead shows position during transport.
+Click piano keys on the left to audition any pitch.
+The piano roll loops independently of the drum machine.`,
   },
   {
     title: '🎛️ FX Rack',
-    content: `Six professional effects on the global FX bus.
+    content: `Six professional effects on the global FX send bus.
 
 DELAY — Tape echo
-• Time, Feedback, Wet/Dry
+• Time: delay length | Feedback: echo decay | Wet: dry/wet mix
 
 REVERB — Convolution reverb
-• Decay, Wet/Dry
+• Decay: room size | Wet: dry/wet mix
 • Presets: Room, Hall, Plate, Cave, Chamber
 
 DISTORTION — Waveshaper
-• Drive amount
+• Drive: distortion amount | Wet: dry/wet mix
 • Presets: Soft Clip, Hard Clip, Fuzz, Overdrive
 
 FILTER — State-variable filter
 • LP, HP, BP, Notch, Peak modes
-• Frequency and Q (resonance)
+• Freq: cutoff frequency | Q: resonance
 
 CHORUS — Modulated delay
-• Rate, Depth, Wet/Dry
+• Rate: LFO speed | Depth: modulation | Wet: dry/wet mix
 
 BITCRUSHER — Lo-fi crunch
-• Bit depth reduction
+• Bits: bit depth reduction
 
-All effects have individual Enable buttons and wet/dry control.
-The FX bus is channel 6 in the Mixer (muting it bypasses all FX).`,
+Each effect has an ON/BYPASS toggle and wet/dry control.
+Route signal to the FX bus using the FX SND knob on mixer channels.`,
   },
   {
     title: '🎚️ Mixer',
-    content: `8-channel mixer with real-time VU metering and FX sends.
+    content: `6-channel mixer with real-time VU metering.
 
-Channel strips:
-• VU meters — 16-segment stereo, peak hold, post-fader
-• Fader — drag up/down to set volume
-• Pan knob — double-click to reset to center
-• FX Send knob — how much of this channel goes to the FX bus
-• M — Mute channel
-• S — Solo channel
+Channel strips (left to right):
+• Drums (Beat Machine)
+• Synth (SynthStation + Piano Roll)
+• Pads (Pad Machine)
+• Keys (spare bus)
+— divider —
+• FX Bus (post-FX chain output)
+• Master
 
-Channel routing:
-• Ch 0 — Drums (Beat Machine)
-• Ch 1 — Synth (SynthStation + Piano Roll)
-• Ch 2 — Pads (Pad Machine)
-• Ch 3 — Keys (spare bus)
-• Ch 4 — Aux (spare bus)
-• Ch 5 — FX Bus (mute = bypass all effects)
-• Ch 6 — Master output
+Per-channel controls:
+• VU meters — 16-segment stereo, peak hold
+• Fader — drag to set volume
+• Pan knob — drag left/right (double-click to center)
+• FX SND knob — send amount to FX Rack (channels 0–3)
+• M — Mute | S — Solo
 
-FX Send: each channel has a send knob that routes a portion
-of its signal through the FX Rack chain. Turn up to add
-reverb/delay/etc. to individual channels independently.
+Header shows stereo output meter for the full mix.`,
+  },
+  {
+    title: '🔊 Compressor',
+    content: `Dynamics compressor on the master bus insert.
 
-Header shows a stereo output meter for the full mix.`,
+Toggle ON/BYPASS to engage. Parameters:
+
+• THRESH — Threshold (dBFS) — level above which compression starts
+• RATIO — Compression ratio (1:1 = transparent, 20:1 = limiter)
+• ATTACK — Time to respond to a peak above threshold
+• RELEASE — Time to recover when signal drops below threshold
+• KNEE — Soft knee width for gradual onset
+• MAKEUP — Output gain compensation after compression
+
+The GR meter shows real-time gain reduction in dB.
+Runs in series with the EQ on the master insert chain.`,
+  },
+  {
+    title: '🎚️ Parametric EQ',
+    content: `5-band parametric equalizer on the master bus insert.
+
+Bands (left to right):
+• LOW — Low shelf, 80Hz (boost or cut bass body)
+• LM — Low-mid peaking, 250Hz (warmth/muddiness)
+• MID — Peaking, 1kHz (presence/honk)
+• HM — High-mid peaking, 4kHz (air/bite)
+• HIGH — High shelf, 12kHz (presence/brilliance)
+
+Controls:
+• Drag the vertical fader up/down to boost or cut ±18dB
+• Double-click any fader to reset to 0dB
+• Toggle ON/BYPASS to engage or bypass the EQ
+
+The frequency response curve updates in real time as you
+adjust the bands. Colored dots show each band's position.`,
+  },
+  {
+    title: '📊 Oscilloscope',
+    content: `Real-time audio visualization from the master output.
+
+Modes:
+• SCOPE — time-domain waveform with phosphor glow effect
+• SPECTRUM — frequency spectrum bar graph
+
+Controls:
+• Gain — amplify the display for quiet signals
+• Color swatches — change waveform color
+• Scale labels show current amplitude range
+
+When signal is present:
+The scope draws 3 overlapping layers (outer glow, mid glow,
+bright core) for a classic analog CRT phosphor look.
+The idle state shows a subtle pulsing flat line.`,
+  },
+  {
+    title: '🌊 MilkDrop Viz',
+    content: `Winamp-inspired audio visualizations. 10 modes total.
+
+• Click anywhere to cycle to the next visualization
+• Click the dots at the bottom to jump to a specific mode
+
+Visualizations:
+1. Spectrum Storm — colorful frequency bars with bloom
+2. Waveform Tunnel — waveform drawn as receding rings
+3. Starburst — radial frequency rays rotating with bass
+4. Aurora Borealis — wavy bands like the northern lights
+5. Particle Swarm — bass-triggered particle explosions
+6. Radial Rings — concentric circles driven by frequencies
+7. Matrix Rain — audio-reactive code rain (green/cyan)
+8. Plasma Wave — swirling plasma driven by frequency
+9. Lissajous — XY waveform figure with trailing glow
+10. Kaleidoscope — radial symmetry driven by frequencies
+
+All visualizations are reactive to the master audio output.
+Visuals are more dramatic with music playing.`,
   },
   {
     title: '🎛️ Pad Machine',
     content: `16-pad sample launcher in a 4×4 grid.
 
 Loading samples:
-1. Click a pad to select it (highlighted border)
+1. Click a pad to select it
 2. Browse the sample library on the right sidebar
-3. Click any sample name to assign it to the selected pad
-4. Click "+ Upload" to load your own audio files (WAV, MP3, OGG, etc.)
-   — uploaded files appear at the top of the sidebar under "My Uploads"
+3. Click any sample to assign to the selected pad
+4. Click "+ Upload" to load your own audio files (WAV, MP3, OGG)
+   — uploaded files appear under "My Uploads"
 
-Pad modes (toggle with the mode button in the controls bar):
-• ONESHOT — plays the sample once on click (good for drums, hits)
-• HOLD — toggles looping on/off (good for loops, ambient pads)
+Pad modes:
+• ONESHOT — plays once on click (good for drums, hits)
+• HOLD — toggles looping on/off (good for ambient pads/loops)
   Click a HOLD pad again to stop it
 
-Active HOLD pads glow with their color and show "● PLAYING".
+Active HOLD pads glow and show "● PLAYING".
 The "Clear" button removes the sample from the selected pad.`,
   },
   {
     title: '💿 Sampler',
     content: `Load audio files and play/manipulate them.
 
-To load samples:
-1. Drag audio files into the drop zone
-2. Or click to browse — WAV, MP3, OGG, FLAC supported
+To load:
+1. Drag audio files into the drop zone, or
+2. Click to browse — WAV, MP3, OGG, FLAC supported
 
 Controls:
-• START / END — trim the sample playback range
+• START / END — trim sample playback range
 • PITCH — transpose ±24 semitones
 • Reverse — play backwards
 • Loop — loop the sample
 • Play button — audition
 
-Double-click a sample name to play it.`,
+Samples are stored in memory only — re-upload after refresh.`,
   },
   {
     title: '📼 Tape Deck',
     content: `Record the master audio output to a file.
 
 1. Click RECORD to start recording
-2. Play music (drums, synth, anything running through master)
-3. Click STOP to finish — file downloads automatically
+2. Play music — everything through the master goes in
+3. Click STOP — file downloads automatically
 
-The recording captures the full master mix including FX.
 Output format: WebM audio (plays in all modern browsers).
-Reels spin visually while recording is active.`,
+The recording captures the full mix including FX, EQ, compression.
+Reels spin visually while recording.`,
   },
   {
     title: '🔢 Tempo Calc',
-    content: `Calculate BPM and delay times.
+    content: `Calculate BPM and musical delay times.
 
 Tap Tempo:
 • Click TAP TEMPO repeatedly in rhythm
-• System averages the tap intervals to detect BPM
-• Click Apply to set as the project tempo
+• System averages tap intervals to detect BPM
+• Click Apply to set the project tempo
 
-Quick presets: 60 → 180 BPM in common increments
+Quick presets: 60–180 BPM at common values
 
 Delay time table shows exact millisecond values for all note
-divisions (whole, half, quarter, 8th, 16th, triplets) at the
-current BPM — useful for dialing in hardware delays or reverb.`,
-  },
-  {
-    title: '📊 Oscilloscope',
-    content: `Real-time audio visualization.
-
-Modes:
-• SCOPE — time-domain waveform (oscilloscope)
-• SPECTRUM — frequency spectrum (bar graph)
-
-Controls:
-• Gain — amplify the display signal
-• Color — choose waveform display color
-
-Reads from the master analyser node — shows everything
-in the final mix in real time at 60fps.`,
+divisions at the current BPM — useful for hardware delays.`,
   },
   {
     title: '⛷️ SkiFree',
@@ -222,139 +285,134 @@ in the final mix in real time at 60fps.`,
 Controls:
 • Arrow Left / A — turn left
 • Arrow Right / D — turn right
-• Speed increases the further you ski
 
 Obstacles:
-• Trees and rocks — crash into them and you'll wipe out
+• Trees and rocks — crash = end run
 • Ski lift poles — avoid the base
-• Flags — purely decorative, ski through freely
+• Flags — decorative, ski through freely
 
 The Yeti:
-After 500m a white furry yeti appears and chases you.
-It's faster than you and will catch up — it always does.
-The game auto-restarts a few seconds after you get eaten.
+After 500m a yeti appears and chases you.
+It's faster than you — it always catches up.
+The game auto-restarts 3 seconds after you're caught or crash.
 Click the canvas any time to restart immediately.
 
 High score is saved between sessions.`,
   },
   {
-    title: '💽 Disk Defragmenter',
-    content: `Simulates a Windows 98-era disk defragmentation.
+    title: '🐑 Screen Mate Poo',
+    content: `A poo companion that lives on your desktop.
 
-The block grid shows all 480 disk clusters:
-• White — Empty
-• Blue — Optimized (contiguous)
-• Red — Fragmented
-• Cyan — System files (unmovable)
-• Green — Currently being read
-• Yellow — Currently being written
+• Double-click the ScreenMate icon (poo sprite) to summon/dismiss
+• The companion roams freely over everything on screen
+• It walks, runs, climbs walls, falls asleep, and more
+• Drag it anywhere — release mid-air for physics-based throwing
 
-Phases:
-1. Analyzing — scans all clusters, maps fragmentation
-2. Defragmenting — moves fragmented blocks to fill gaps,
-   consolidating free space to the end of the disk
-3. Complete — all movable files are contiguous
+Random events (happen on their own):
+• Climbing walls and walking upside-down along the top
+• Burning and landing in a bathtub
+• Bouncing / boing
+• Sitting and staring | Yawning | Sleeping | Rolling around
+• UFO abduction and return
+• Black sheep encounter
+• Eating flowers
+• Alien encounter (UFO drops an alien who waves)
 
-Classic behavior:
-The defragmenter may restart itself if it detects that
-another program has written to the drive. This is accurate
-to the original Windows 98 behavior and is deeply annoying.
+Console debug commands (open browser DevTools → Console):
+• sheep.burn()       — fire sequence
+• sheep.boing()      — bounce
+• sheep.climb()      — wall climb
+• sheep.blacksheep() — second sheep encounter
+• sheep.ufo()        — UFO abduction
+• sheep.alien()      — UFO alien encounter
+• sheep.sleep()      — poo sleeping animation
+• sheep.sit()        — poo sitting animation
+• sheep.yawn()       — poo yawning animation
+• sheep.roll()       — poo rolling animation
+• sheep.flower()     — spawn a flower to eat
+• sheep.jump()       — jump
+• sheep.random()     — trigger a random event
 
-Drive D: is also available (cosmetically identical to C:).`,
+Based on eSheep64 by Adrianotiger (sprite used with thanks).
+Scmpoo sprite sheets by original ScreenMate authors.`,
   },
   {
-    title: '🐑 ScreenMate',
-    content: `A sheep that lives on your desktop.
-
-• Double-click the ScreenMate icon to summon or dismiss the sheep
-• The sheep roams freely over everything — windows, taskbar, the works
-• It walks, runs, and falls asleep on its own
-
-You can drag the sheep anywhere with your mouse.
-Release it mid-air for a satisfying throw — it has physics.
-
-Based on eSheep64 by Adrianotiger (sprite sheet used with thanks).`,
-  },
-  {
-    title: '⌨️ Keyboard Shortcuts',
+    title: '⌨️ Keyboard & Controls',
     content: `Global:
 • SPACE — Play / Stop transport
 
-SynthStation (when focused):
+SynthStation (keyboard focus):
 • A W S E D F T G Y H U J K O L P — Piano notes
-• Z — Octave down
-• X — Octave up
+• Z — Octave down | X — Octave up
 
 Transport bar:
-• Click the project name to rename it inline
-• Press Enter or click away to confirm
-• Press Escape to cancel
+• Click project name to rename (Enter to confirm, Esc to cancel)
+• 💾 Save — download .mos98 project file
+• 📂 Load — open .mos98 file
 
 Window management:
 • Double-click title bar — Maximize / restore
 • Drag title bar — Move window
 • Drag window edge/corner — Resize
-• Click taskbar button — Focus or minimize
+• Click taskbar button — Focus or minimize window
 
-Desktop right-click menu:
-• Change Wallpaper — cycle through 17 gradient wallpapers
-  (dark, mid-tone, light, and vivid — saved between sessions)
-• New Project — clear everything and start fresh
-• Save Project — download as .mos98 file
-• Open Project — load a .mos98 file
-• Audio Settings — opens the FX Rack`,
+Desktop right-click:
+• Change Wallpaper — cycle 17 gradients (saved in localStorage)
+• New Project — clear and start fresh
+• Save Project — download .mos98 file
+• Open Project — load .mos98 file
+• About — open Help`,
   },
   {
     title: '💾 Projects',
     content: `Save and load your entire project state.
 
 Save:
-• Click 💾 Save in the transport bar, or
+• Click 💾 in the transport bar, or
 • Right-click desktop → Save Project
 • Downloads a .mos98 file (JSON format)
 
 Load:
-• Click 📂 Load in the transport bar, or
+• Click 📂 in the transport bar, or
 • Right-click desktop → Open Project...
 • Accepts .mos98 and .json files
 
 What is saved:
 • Project name and BPM
-• Full drum pattern + swing + channel gains
-• All synth parameters (oscillators, filter, envelope, LFO)
+• Full drum patterns (A/B/C/D) + swing + step count + channel gains
+• All synth parameters
 • Piano roll notes and loop length
-• Mixer channel states
+• Mixer channel states (gain, pan, mute, solo, FX sends)
 • FX Rack settings
 
-Note: User-uploaded samples in the Pad Machine are not saved
-in the project file (audio data is too large). Re-upload them
-after loading a project.`,
+What is NOT saved:
+• Synth patches (stored separately in localStorage)
+• Uploaded samples in Pad Machine (audio data too large)
+• Wallpaper preference (stored in localStorage separately)`,
   },
   {
     title: '🐛 Tips & Easter Eggs',
     content: `Things to try:
-• VU meters respond in real time even without transport running
-  — just play the synth
-• Piano roll note colors: cyan = white key, purple = black key
-• The SynthStation dot-matrix visualizer tracks note frequency
-• Boot screen has a fake BIOS POST sequence
-• Tap the Tempo Calc in rhythm to detect BPM by ear
-• The Tape Deck reels spin while recording
-• Drum steps glow in their channel's accent color
+• VU meters respond even without transport — just play synth
+• Piano roll: cyan notes = white keys, purple = black keys
+• Dot-matrix visualizer in SynthStation tracks note frequency position
+• Boot screen has a fake BIOS POST sequence on first load
 • Right-click desktop → Change Wallpaper cycles 17 gradients
-• Click the project name in the transport bar to rename it
-• Throw the sheep by dragging and releasing — it has momentum
-• The sheep will fall asleep if left alone long enough
+• Drag and throw the ScreenMate poo — it has real momentum physics
+• MilkDrop Matrix Rain reacts to audio — frequency drives fall speed
+• Compressor GR meter shows how hard it's working in real time
+• EQ frequency curve updates live as you drag band faders
 
 Performance tips:
-• FX Rack effects are CPU-intensive — disable unused ones
-• Reverb is the most expensive effect — keep wet mix low
+• FX Rack reverb is most CPU-intensive — keep wet mix low
 • Up to 8 simultaneous synth voices before clipping
-• Mute the FX Bus channel in the Mixer to bypass all effects
+• Disable unused FX Rack effects to save CPU
+• Mute the FX Bus channel in Mixer to bypass all effects at once
 
 Credits:
-Built with React + Web Audio API + Zustand
+Built with React 18 + Web Audio API + Zustand + TypeScript
 eSheep64 sprite by Adrianotiger
+Scmpoo sprites from original ScreenMate
 MusicOS 98 — Where nostalgia meets synthesis
 
 "If it sounds right, it is right."`,
@@ -368,7 +426,7 @@ export default function Help() {
     <div className="plugin-bg" style={{ display: 'flex', height: '100%' }}>
       {/* Topics list */}
       <div style={{
-        width: 190, flexShrink: 0, borderRight: '1px solid var(--px-border)',
+        width: 200, flexShrink: 0, borderRight: '1px solid var(--px-border)',
         overflowY: 'auto', padding: 4,
       }}>
         <div style={{ fontSize: 9, color: 'var(--px-text-dim)', padding: '4px 6px', textTransform: 'uppercase', letterSpacing: 1 }}>

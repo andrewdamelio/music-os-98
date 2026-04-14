@@ -41,6 +41,27 @@ export interface MixerChannelState {
   fxSend: number; // 0–1 send level to FX bus
 }
 
+export interface CompParams {
+  enabled: boolean;
+  threshold: number; // dBFS
+  ratio: number;
+  attack: number;   // seconds
+  release: number;  // seconds
+  knee: number;     // dB
+  makeup: number;   // linear gain
+}
+
+export interface EQParams {
+  enabled: boolean;
+  gains: number[]; // 5 bands in dB, indices 0–4
+}
+
+export type PadAssignment = {
+  sampleName: string | null;
+  mode: 'oneshot' | 'hold';
+  color: string;
+};
+
 export interface PianoNote {
   id: string;
   note: number;
@@ -51,8 +72,8 @@ export interface PianoNote {
 
 export const APPS: AppDef[] = [
   { id: 'drum-machine', title: 'Beat Machine', icon: '🥁', component: 'DrumMachine', defaultSize: { w: 820, h: 420 }, singleton: true },
-  { id: 'synth', title: 'SynthStation', icon: '🎹', component: 'Synth', defaultSize: { w: 860, h: 460 }, singleton: true },
-  { id: 'mixer', title: 'Mixer', icon: '🎚️', component: 'Mixer', defaultSize: { w: 760, h: 530 }, singleton: true },
+  { id: 'synth', title: 'SynthStation', icon: '🎹', component: 'Synth', defaultSize: { w: 860, h: 540 }, singleton: true },
+  { id: 'mixer', title: 'Mixer', icon: '🎚️', component: 'Mixer', defaultSize: { w: 540, h: 500 }, singleton: true },
   { id: 'piano-roll', title: 'Piano Roll', icon: '🎼', component: 'PianoRoll', defaultSize: { w: 820, h: 540 }, singleton: true },
   { id: 'fx-rack', title: 'FX Rack', icon: '🎛️', component: 'FXRack', defaultSize: { w: 540, h: 660 }, singleton: true },
   { id: 'sampler', title: 'Sampler', icon: '💿', component: 'Sampler', defaultSize: { w: 580, h: 460 }, singleton: true },
@@ -60,12 +81,13 @@ export const APPS: AppDef[] = [
   { id: 'file-browser', title: 'Sample Library', icon: '📁', component: 'FileBrowser', defaultSize: { w: 540, h: 460 }, singleton: true },
   { id: 'tempo-calc', title: 'Tempo Calc', icon: '🔢', component: 'TempoCalc', defaultSize: { w: 340, h: 400 }, singleton: true },
   { id: 'help', title: 'Help & Manual', icon: '❓', component: 'Help', defaultSize: { w: 620, h: 520 }, singleton: true },
-  { id: 'oscilloscope', title: 'Oscilloscope', icon: '📊', component: 'Oscilloscope', defaultSize: { w: 820, h: 380 }, singleton: true },
+  { id: 'oscilloscope', title: 'Oscilloscope', icon: '📊', component: 'Oscilloscope', defaultSize: { w: 560, h: 280 }, singleton: true },
+  { id: 'milkdrop', title: 'MilkDrop Viz', icon: '🌊', component: 'MilkDrop', defaultSize: { w: 640, h: 520 }, singleton: true },
   { id: 'compressor', title: 'Compressor', icon: '🔊', component: 'Compressor', defaultSize: { w: 560, h: 320 }, singleton: true },
   { id: 'eq', title: 'Parametric EQ', icon: '🎛️', component: 'EQ', defaultSize: { w: 580, h: 420 }, singleton: true },
   { id: 'pad-machine', title: 'Pad Machine', icon: '🎮', component: 'PadMachine', defaultSize: { w: 720, h: 540 }, singleton: true },
   { id: 'ski-free', title: 'SkiFree', icon: '⛷️', component: 'SkiFree', defaultSize: { w: 600, h: 480 }, singleton: true },
-  { id: 'screen-mate', title: 'ScreenMate 🐑', icon: '🐑', component: 'ScreenMate', defaultSize: { w: 400, h: 300 }, singleton: false },
+  { id: 'screen-mate', title: 'Screen Mate Poo', icon: '🐑', component: 'ScreenMate', defaultSize: { w: 400, h: 300 }, singleton: false },
 ];
 
 let zCounter = 100;
@@ -132,6 +154,8 @@ interface OSStore {
   // Synth params
   synthParams: SynthParams;
   updateSynthParam: <K extends keyof SynthParams>(param: K, value: SynthParams[K]) => void;
+  activeSynthPatch: string;
+  setActiveSynthPatch: (name: string) => void;
 
   // Piano roll
   pianoNotes: PianoNote[];
@@ -150,6 +174,19 @@ interface OSStore {
   // FX
   fxParams: FXParams;
   updateFX: <K extends keyof FXParams>(fx: K, update: Partial<FXParams[K]>) => void;
+
+  // Pad Machine
+  padAssignments: PadAssignment[];
+  updatePadAssignment: (idx: number, update: Partial<PadAssignment>) => void;
+
+  // Compressor (master insert)
+  compParams: CompParams;
+  setCompParam: (k: keyof CompParams, v: number | boolean) => void;
+
+  // EQ (master insert)
+  eqParams: EQParams;
+  setEQEnabled: (enabled: boolean) => void;
+  setEQBand: (idx: number, gain: number) => void;
 }
 
 const defaultMixerChannels: MixerChannelState[] = [
@@ -322,17 +359,35 @@ export const useOSStore = create<OSStore>((set, get) => ({
   saveProject: () => {
     const s = get();
     const data = {
-      version: 1,
+      version: 2,
       projectName: s.projectName,
       bpm: s.bpm,
-      drumPattern: s.drumPattern,
+      // Drum machine — all 4 patterns + metadata
+      drumPatterns: s.drumPatterns,
+      currentPatternIdx: s.currentPatternIdx,
+      drumStepCount: s.drumStepCount,
       drumSwing: s.drumSwing,
       drumChannelGains: s.drumChannelGains,
+      // Synth
       synthParams: s.synthParams,
+      activeSynthPatch: s.activeSynthPatch,
+      // Piano roll
       pianoNotes: s.pianoNotes,
       pianoRollEnabled: s.pianoRollEnabled,
+      pianoRollBeats: s.pianoRollBeats,
+      // Pad Machine (sample names + modes only — buffers are regenerated on load)
+      padAssignments: s.padAssignments,
+      // Mixer
       mixerChannels: s.mixerChannels,
+      // FX chain
       fxParams: s.fxParams,
+      compParams: s.compParams,
+      eqParams: s.eqParams,
+      // Window layout
+      windows: s.windows.map(w => ({
+        appId: w.appId, x: w.x, y: w.y, w: w.w, h: w.h,
+        minimized: w.minimized, maximized: w.maximized,
+      })),
     };
     const json = JSON.stringify(data, null, 2);
     localStorage.setItem('musicOS98_project', json);
@@ -350,14 +405,36 @@ export const useOSStore = create<OSStore>((set, get) => ({
   loadProjectFromJSON: (json: string) => {
     try {
       const data = JSON.parse(json);
-      if (!data || data.version !== 1) return;
+      if (!data || (data.version !== 1 && data.version !== 2)) return;
+
+      audioEngine.init(); // ensure audio engine is ready before applying params
+
       if (data.projectName) set({ projectName: data.projectName });
       if (data.bpm) { audioEngine.setBPM(data.bpm); set({ bpm: data.bpm }); }
-      if (data.drumPattern) {
+
+      // ── Drum machine ──────────────────────────────────────────────────────────
+      if (data.drumPatterns && Array.isArray(data.drumPatterns)) {
+        // v2: all 4 patterns
+        const pats: boolean[][][] = data.drumPatterns.map((pat: boolean[][]) =>
+          pat.map((row: boolean[]) => [...row])
+        );
+        const idx = data.currentPatternIdx ?? 0;
+        const current = pats[idx] ?? pats[0];
+        audioEngine.drumPattern = current.map(row => [...row]);
+        set({ drumPatterns: pats, currentPatternIdx: idx, drumPattern: current });
+      } else if (data.drumPattern) {
+        // v1 compat: single pattern
         audioEngine.drumPattern = data.drumPattern.map((row: boolean[]) => [...row]);
         set({ drumPattern: data.drumPattern });
       }
-      if (data.drumSwing !== undefined) set({ drumSwing: data.drumSwing });
+      if (data.drumStepCount) {
+        audioEngine.drumStepCount = data.drumStepCount;
+        set({ drumStepCount: data.drumStepCount });
+      }
+      if (data.drumSwing !== undefined) {
+        audioEngine.drumSwing = data.drumSwing;
+        set({ drumSwing: data.drumSwing });
+      }
       if (data.drumChannelGains) {
         data.drumChannelGains.forEach((gain: number, i: number) => {
           const ch = DRUM_CHANNELS[i] as DrumChannel;
@@ -365,12 +442,19 @@ export const useOSStore = create<OSStore>((set, get) => ({
         });
         set({ drumChannelGains: data.drumChannelGains });
       }
+
+      // ── Synth ─────────────────────────────────────────────────────────────────
       if (data.synthParams) {
         Object.entries(data.synthParams as SynthParams).forEach(([k, v]) => {
           audioEngine.updateSynthParam(k as keyof SynthParams, v as any);
         });
         set({ synthParams: { ...audioEngine.synthParams, ...data.synthParams } });
       }
+      if (data.activeSynthPatch !== undefined) {
+        set({ activeSynthPatch: data.activeSynthPatch });
+      }
+
+      // ── Piano roll ────────────────────────────────────────────────────────────
       if (data.pianoNotes) {
         audioEngine.pianoRollNotes = data.pianoNotes.map((n: any) => ({
           note: n.note, beat: n.beat, duration: n.duration, channel: n.channel,
@@ -381,20 +465,70 @@ export const useOSStore = create<OSStore>((set, get) => ({
         audioEngine.pianoRollEnabled = data.pianoRollEnabled;
         set({ pianoRollEnabled: data.pianoRollEnabled });
       }
+      if (data.pianoRollBeats) {
+        audioEngine.pianoRollBeats = data.pianoRollBeats;
+        set({ pianoRollBeats: data.pianoRollBeats });
+      }
+
+      // ── Pad Machine ──────────────────────────────────────────────────────────
+      if (data.padAssignments && Array.isArray(data.padAssignments)) {
+        set({ padAssignments: data.padAssignments });
+      }
+
+      // ── Mixer ─────────────────────────────────────────────────────────────────
       if (data.mixerChannels) {
         data.mixerChannels.forEach((ch: any, i: number) => {
           if (ch.gain !== undefined) audioEngine.setChannelGain(i, ch.gain);
           if (ch.pan !== undefined) audioEngine.setChannelPan(i, ch.pan);
           if (ch.muted !== undefined) audioEngine.setChannelMute(i, ch.muted);
+          if (ch.fxSend !== undefined) audioEngine.setChannelSend(i, ch.fxSend);
         });
         set({ mixerChannels: data.mixerChannels });
       }
+
+      // ── FX chain ──────────────────────────────────────────────────────────────
       if (data.fxParams) {
         (Object.keys(data.fxParams) as Array<keyof FXParams>).forEach(fx => {
           audioEngine.updateFX(fx, data.fxParams[fx]);
         });
         set({ fxParams: { ...audioEngine.fxParams, ...data.fxParams } });
       }
+      if (data.compParams) {
+        const cp: CompParams = data.compParams;
+        audioEngine.setUserCompEnabled(cp.enabled ?? false);
+        if (cp.threshold !== undefined) audioEngine.setUserCompParam('threshold', cp.threshold);
+        if (cp.ratio !== undefined) audioEngine.setUserCompParam('ratio', cp.ratio);
+        if (cp.attack !== undefined) audioEngine.setUserCompParam('attack', cp.attack);
+        if (cp.release !== undefined) audioEngine.setUserCompParam('release', cp.release);
+        if (cp.knee !== undefined) audioEngine.setUserCompParam('knee', cp.knee);
+        if (cp.makeup !== undefined) audioEngine.setUserCompParam('makeupGain', cp.makeup);
+        set({ compParams: cp });
+      }
+      if (data.eqParams) {
+        const eq: EQParams = data.eqParams;
+        audioEngine.setUserEQEnabled(eq.enabled ?? false);
+        if (eq.gains) eq.gains.forEach((gain: number, i: number) => audioEngine.setUserEQBand(i, gain));
+        set({ eqParams: eq });
+      }
+
+      // ── Window layout ─────────────────────────────────────────────────────────
+      if (data.windows && Array.isArray(data.windows)) {
+        const restored: WindowState[] = (data.windows as any[]).map(w => {
+          const app = APPS.find(a => a.id === w.appId);
+          if (!app) return null;
+          return {
+            instanceId: `${w.appId}-${Date.now()}-${Math.random()}`,
+            appId: w.appId,
+            title: app.title,
+            x: w.x ?? 50, y: w.y ?? 50,
+            w: w.w ?? app.defaultSize.w, h: w.h ?? app.defaultSize.h,
+            minimized: w.minimized ?? false, maximized: w.maximized ?? false,
+            zIndex: ++zCounter,
+          } as WindowState;
+        }).filter(Boolean) as WindowState[];
+        set({ windows: restored, focusedWindowId: restored[restored.length - 1]?.instanceId ?? null });
+      }
+
       localStorage.setItem('musicOS98_project', json);
     } catch (e) {
       console.error('Failed to load project:', e);
@@ -477,6 +611,8 @@ export const useOSStore = create<OSStore>((set, get) => ({
     audioEngine.updateSynthParam(param, value);
     set(s => ({ synthParams: { ...s.synthParams, [param]: value } }));
   },
+  activeSynthPatch: '',
+  setActiveSynthPatch: (name) => set({ activeSynthPatch: name }),
 
   // Piano roll
   pianoNotes: [],
@@ -536,5 +672,40 @@ export const useOSStore = create<OSStore>((set, get) => ({
     set(s => ({
       fxParams: { ...s.fxParams, [fx]: { ...s.fxParams[fx], ...update } },
     }));
+  },
+
+  // Pad Machine
+  padAssignments: Array.from({ length: 16 }, () => ({ sampleName: null, mode: 'oneshot' as const, color: '' })),
+  updatePadAssignment: (idx, update) => set(s => {
+    const next = [...s.padAssignments];
+    next[idx] = { ...next[idx], ...update };
+    return { padAssignments: next };
+  }),
+
+  // Compressor
+  compParams: { enabled: false, threshold: -20, ratio: 4, attack: 0.003, release: 0.25, knee: 10, makeup: 1.0 },
+  setCompParam: (k, v) => {
+    set(s => ({ compParams: { ...s.compParams, [k]: v } }));
+    if (k === 'enabled') {
+      audioEngine.setUserCompEnabled(v as boolean);
+    } else {
+      const engineKey = k === 'makeup' ? 'makeupGain' : k as any;
+      audioEngine.setUserCompParam(engineKey, v as number);
+    }
+  },
+
+  // EQ
+  eqParams: { enabled: false, gains: [0, 0, 0, 0, 0] },
+  setEQEnabled: (enabled) => {
+    set(s => ({ eqParams: { ...s.eqParams, enabled } }));
+    audioEngine.setUserEQEnabled(enabled);
+  },
+  setEQBand: (idx, gain) => {
+    set(s => {
+      const gains = [...s.eqParams.gains];
+      gains[idx] = parseFloat(gain.toFixed(2));
+      audioEngine.setUserEQBand(idx, gains[idx]);
+      return { eqParams: { ...s.eqParams, gains } };
+    });
   },
 }));

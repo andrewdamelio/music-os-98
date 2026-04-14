@@ -1,6 +1,42 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useOSStore } from '../store';
 import { audioEngine } from '../audio/engine';
+import type { SynthParams } from '../audio/engine';
+
+// ── Factory Patches ──────────────────────────────────────────────────────────
+interface Patch { name: string; params: SynthParams; factory?: boolean; }
+
+const FACTORY_PATCHES: Patch[] = [
+  { name: 'Init', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'square', osc2Detune: 0, osc2Mix: 0, attack: 0.01, decay: 0.15, sustain: 0.6, release: 0.4, filterFreq: 18000, filterQ: 1, filterEnvAmount: 0, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.7 } },
+  { name: 'Supersaw Lead', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'sawtooth', osc2Detune: 11, osc2Mix: 0.8, attack: 0.008, decay: 0.2, sustain: 0.7, release: 0.35, filterFreq: 3400, filterQ: 1.5, filterEnvAmount: 0.3, lfoRate: 0.4, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.65 } },
+  { name: 'Acid Bass', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'sawtooth', osc2Detune: 0, osc2Mix: 0, attack: 0.002, decay: 0.18, sustain: 0.0, release: 0.08, filterFreq: 600, filterQ: 14, filterEnvAmount: 0.9, lfoRate: 8, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.75 } },
+  { name: '808 Bass', factory: true, params: { oscillatorType: 'sine', osc2Type: 'sine', osc2Detune: 0, osc2Mix: 0, attack: 0.005, decay: 0.8, sustain: 0.0, release: 0.5, filterFreq: 220, filterQ: 0.8, filterEnvAmount: 0, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.9 } },
+  { name: 'Reese Bass', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'sawtooth', osc2Detune: -14, osc2Mix: 0.95, attack: 0.01, decay: 0.3, sustain: 0.8, release: 0.2, filterFreq: 400, filterQ: 2, filterEnvAmount: 0.1, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.7 } },
+  { name: 'Wobble Bass', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'sawtooth', osc2Detune: 7, osc2Mix: 0.5, attack: 0.01, decay: 0.2, sustain: 0.6, release: 0.25, filterFreq: 280, filterQ: 8, filterEnvAmount: 0.4, lfoRate: 4, lfoDepth: 380, lfoTarget: 'filter', masterGain: 0.7 } },
+  { name: 'Pluck', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'triangle', osc2Detune: 5, osc2Mix: 0.3, attack: 0.001, decay: 0.12, sustain: 0.0, release: 0.15, filterFreq: 2200, filterQ: 3, filterEnvAmount: 0.7, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.7 } },
+  { name: 'Glass Bell', factory: true, params: { oscillatorType: 'sine', osc2Type: 'triangle', osc2Detune: 12, osc2Mix: 0.4, attack: 0.002, decay: 0.6, sustain: 0.0, release: 1.2, filterFreq: 8000, filterQ: 1, filterEnvAmount: 0, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.6 } },
+  { name: 'Brass Stab', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'square', osc2Detune: 3, osc2Mix: 0.45, attack: 0.005, decay: 0.08, sustain: 0.4, release: 0.1, filterFreq: 1800, filterQ: 3.5, filterEnvAmount: 0.85, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.7 } },
+  { name: 'Rave Stab', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'sawtooth', osc2Detune: 7, osc2Mix: 0.7, attack: 0.001, decay: 0.06, sustain: 0.0, release: 0.06, filterFreq: 900, filterQ: 6, filterEnvAmount: 1.0, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.75 } },
+  { name: 'Lush Pad', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'triangle', osc2Detune: 9, osc2Mix: 0.6, attack: 0.55, decay: 0.4, sustain: 0.75, release: 1.2, filterFreq: 1800, filterQ: 0.8, filterEnvAmount: 0.1, lfoRate: 0.3, lfoDepth: 120, lfoTarget: 'filter', masterGain: 0.6 } },
+  { name: 'Cinematic', factory: true, params: { oscillatorType: 'sine', osc2Type: 'triangle', osc2Detune: -7, osc2Mix: 0.5, attack: 1.2, decay: 0.6, sustain: 0.65, release: 2.5, filterFreq: 2400, filterQ: 0.7, filterEnvAmount: 0, lfoRate: 0.15, lfoDepth: 80, lfoTarget: 'amp', masterGain: 0.6 } },
+  { name: 'Soft Lead', factory: true, params: { oscillatorType: 'triangle', osc2Type: 'sine', osc2Detune: 6, osc2Mix: 0.3, attack: 0.02, decay: 0.25, sustain: 0.55, release: 0.4, filterFreq: 3200, filterQ: 1.2, filterEnvAmount: 0.2, lfoRate: 5, lfoDepth: 30, lfoTarget: 'pitch', masterGain: 0.65 } },
+  { name: 'Dirty Lead', factory: true, params: { oscillatorType: 'square', osc2Type: 'sawtooth', osc2Detune: -5, osc2Mix: 0.7, attack: 0.005, decay: 0.1, sustain: 0.6, release: 0.2, filterFreq: 4500, filterQ: 4, filterEnvAmount: 0.4, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.65 } },
+  { name: 'Sub Bass', factory: true, params: { oscillatorType: 'sine', osc2Type: 'sine', osc2Detune: 0, osc2Mix: 0, attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3, filterFreq: 120, filterQ: 0.5, filterEnvAmount: 0, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.9 } },
+  { name: 'Chip Lead', factory: true, params: { oscillatorType: 'square', osc2Type: 'square', osc2Detune: -12, osc2Mix: 0.3, attack: 0.001, decay: 0.05, sustain: 0.7, release: 0.05, filterFreq: 6000, filterQ: 1, filterEnvAmount: 0.1, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.65 } },
+  { name: 'Moog Bass', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'sawtooth', osc2Detune: -1, osc2Mix: 0.5, attack: 0.006, decay: 0.35, sustain: 0.3, release: 0.25, filterFreq: 350, filterQ: 5, filterEnvAmount: 0.75, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.75 } },
+  { name: 'Formant', factory: true, params: { oscillatorType: 'sawtooth', osc2Type: 'sine', osc2Detune: 0, osc2Mix: 0.2, attack: 0.08, decay: 0.3, sustain: 0.5, release: 0.5, filterFreq: 800, filterQ: 18, filterEnvAmount: 0.3, lfoRate: 0.8, lfoDepth: 200, lfoTarget: 'filter', masterGain: 0.6 } },
+  { name: 'Vinyl Keys', factory: true, params: { oscillatorType: 'triangle', osc2Type: 'sine', osc2Detune: 0, osc2Mix: 0, attack: 0.003, decay: 0.5, sustain: 0.0, release: 0.6, filterFreq: 2800, filterQ: 1, filterEnvAmount: 0, lfoRate: 3, lfoDepth: 0, lfoTarget: 'filter', masterGain: 0.65 } },
+  { name: 'Siren', factory: true, params: { oscillatorType: 'sine', osc2Type: 'sine', osc2Detune: 0, osc2Mix: 0, attack: 0.3, decay: 0.1, sustain: 0.8, release: 0.4, filterFreq: 18000, filterQ: 1, filterEnvAmount: 0, lfoRate: 2.5, lfoDepth: 400, lfoTarget: 'pitch', masterGain: 0.65 } },
+];
+
+const LS_KEY = 'musicOS98_synthPatches';
+
+function loadUserPatches(): Patch[] {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? '[]'); } catch { return []; }
+}
+function saveUserPatches(patches: Patch[]) {
+  localStorage.setItem(LS_KEY, JSON.stringify(patches));
+}
 
 // 5 octaves: C2 (36) to C7 (96) — 36 white keys, fits ~780px at 22px each
 const KEY_W = 22; // white key width in px
@@ -232,12 +268,132 @@ function Knob({ label, value, min, max, step = 0.01, onChange, color = 'var(--px
   );
 }
 
+// ── Patch Browser ─────────────────────────────────────────────────────────────
+function PatchBrowser({ onLoad }: { onLoad: (p: Patch) => void }) {
+  const [userPatches, setUserPatches] = useState<Patch[]>(loadUserPatches);
+  const [saveName, setSaveName] = useState('');
+  const [showSave, setShowSave] = useState(false);
+  const { synthParams, activeSynthPatch, setActiveSynthPatch } = useOSStore();
+
+  const allPatches = [...FACTORY_PATCHES, ...userPatches];
+  // Resolve activeName: use store value if it exists in patch list, else fall back to first patch
+  const activeName = allPatches.find(p => p.name === activeSynthPatch) ? activeSynthPatch : FACTORY_PATCHES[0].name;
+
+  const load = (p: Patch) => {
+    setActiveSynthPatch(p.name);
+    onLoad(p);
+  };
+
+  const saveNew = () => {
+    const name = saveName.trim() || `Patch ${userPatches.length + 1}`;
+    const newPatch: Patch = { name, params: { ...synthParams } };
+    const updated = [...userPatches.filter(p => p.name !== name), newPatch];
+    setUserPatches(updated);
+    saveUserPatches(updated);
+    setActiveSynthPatch(name);
+    setSaveName('');
+    setShowSave(false);
+  };
+
+  const deleteUserPatch = (name: string) => {
+    const updated = userPatches.filter(p => p.name !== name);
+    setUserPatches(updated);
+    saveUserPatches(updated);
+    if (activeName === name) setActiveSynthPatch(FACTORY_PATCHES[0].name);
+  };
+
+  const activeIsUser = !FACTORY_PATCHES.find(p => p.name === activeName);
+
+  return (
+    <div style={{
+      background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0,229,255,0.1)',
+      borderRadius: 4, padding: '6px 8px', marginBottom: 8, flexShrink: 0,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 9, color: 'rgba(0,229,255,0.6)', fontFamily: 'monospace', letterSpacing: 1, flexShrink: 0 }}>
+          PATCHES
+        </span>
+        <select
+          value={activeName}
+          onChange={e => { const p = allPatches.find(x => x.name === e.target.value); if (p) load(p); }}
+          style={{
+            flex: 1, background: '#0a0b14', border: '1px solid rgba(0,229,255,0.25)',
+            color: activeIsUser ? '#bf00ff' : '#00e5ff', fontSize: 10, padding: '3px 6px',
+            borderRadius: 2, fontFamily: 'monospace', outline: 'none', cursor: 'pointer',
+          }}
+        >
+          <optgroup label="— Factory —" style={{ color: 'rgba(0,229,255,0.5)', background: '#0a0b14' }}>
+            {FACTORY_PATCHES.map(p => (
+              <option key={p.name} value={p.name} style={{ color: '#00e5ff', background: '#0a0b14' }}>{p.name}</option>
+            ))}
+          </optgroup>
+          {userPatches.length > 0 && (
+            <optgroup label="— Saved —" style={{ color: 'rgba(191,0,255,0.6)', background: '#0a0b14' }}>
+              {userPatches.map(p => (
+                <option key={p.name} value={p.name} style={{ color: '#bf00ff', background: '#0a0b14' }}>{p.name}</option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+        {activeIsUser && (
+          <button
+            onClick={() => deleteUserPatch(activeName)}
+            title="Delete patch"
+            style={{
+              fontSize: 9, padding: '3px 6px', cursor: 'pointer', flexShrink: 0,
+              background: 'rgba(255,50,50,0.1)', color: 'rgba(255,100,100,0.7)',
+              border: '1px solid rgba(255,50,50,0.3)', borderRadius: 2,
+            }}
+          >× DEL</button>
+        )}
+        {showSave ? (
+          <>
+            <input
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveNew(); if (e.key === 'Escape') setShowSave(false); }}
+              placeholder="Name..."
+              autoFocus
+              style={{
+                background: '#0a0b14', border: '1px solid rgba(0,229,255,0.3)',
+                color: '#00e5ff', fontSize: 9, padding: '3px 6px', borderRadius: 2,
+                fontFamily: 'monospace', width: 100, outline: 'none', flexShrink: 0,
+              }}
+            />
+            <button onClick={saveNew} style={{
+              fontSize: 9, padding: '3px 8px', cursor: 'pointer', flexShrink: 0,
+              background: 'rgba(0,229,255,0.15)', color: '#00e5ff',
+              border: '1px solid rgba(0,229,255,0.4)', borderRadius: 2,
+            }}>OK</button>
+            <button onClick={() => setShowSave(false)} style={{
+              fontSize: 9, padding: '3px 5px', cursor: 'pointer', flexShrink: 0,
+              background: 'transparent', color: 'rgba(255,255,255,0.3)',
+              border: '1px solid #333', borderRadius: 2,
+            }}>✕</button>
+          </>
+        ) : (
+          <button onClick={() => setShowSave(true)} style={{
+            fontSize: 9, padding: '3px 8px', cursor: 'pointer', flexShrink: 0,
+            background: 'rgba(0,229,255,0.08)', color: 'rgba(0,229,255,0.6)',
+            border: '1px solid rgba(0,229,255,0.2)', borderRadius: 2, fontFamily: 'monospace',
+          }}>+ SAVE</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Synth ────────────────────────────────────────────────────────────────────
 
 export default function Synth() {
   const { synthParams, updateSynthParam } = useOSStore();
   const [pressedKeys, setPressedKeys] = useState<Set<number>>(new Set());
   const [octaveShift, setOctaveShift] = useState(0);
+
+  const loadPatch = useCallback((p: Patch) => {
+    const keys = Object.keys(p.params) as (keyof SynthParams)[];
+    keys.forEach(k => updateSynthParam(k, p.params[k] as never));
+  }, [updateSynthParam]);
   const channelIndex = 1;
 
   // Map: visual note (unshifted) → actual MIDI note playing in engine
@@ -344,9 +500,11 @@ export default function Synth() {
 
   return (
     <div className="plugin-bg" style={{ padding: 12 }}>
-      <div style={{ color: 'var(--px-cyan)', fontFamily: "'VT323', monospace", fontSize: 22, marginBottom: 10 }}>
+      <div style={{ color: 'var(--px-cyan)', fontFamily: "'VT323', monospace", fontSize: 22, marginBottom: 8 }}>
         🎹 SYNTHSTATION — SubTrax Engine
       </div>
+
+      <PatchBrowser onLoad={loadPatch} />
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         {/* OSC 1 */}

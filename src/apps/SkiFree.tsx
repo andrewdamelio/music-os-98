@@ -383,6 +383,14 @@ export default function SkiFree() {
               const type: Obstacle['type'] = r < 0.50 ? 'tree' : r < 0.80 ? 'rock' : r < 0.94 ? 'flag' : 'lift';
               g.obstacles.push({ id: nextId++, x, y: screenY, type });
             }
+            // Edge blockers — trees hugging both sides so players can't cheat by wall-hugging
+            // ~65% chance per row on each edge, so there's almost always something to dodge near walls
+            if (Math.random() < 0.65) {
+              g.obstacles.push({ id: nextId++, x: 6 + Math.random() * 22, y: screenY, type: 'tree' });
+            }
+            if (Math.random() < 0.65) {
+              g.obstacles.push({ id: nextId++, x: W - 6 - Math.random() * 22, y: screenY, type: 'tree' });
+            }
             g.spawnFrontier += ROW_SPACING;
           }
 
@@ -421,10 +429,18 @@ export default function SkiFree() {
             }
           }
 
-          // Monster spawn after 500m
-          if (g.score > 5000 && !g.monsterActive) {
-            g.monsterActive = true;
-            g.monsterY = -60;
+          // Monster spawn — probabilistic after 500m, chance ramps up with distance
+          // Checked once per second (every 60 ticks) to avoid per-frame noise
+          if (!g.monsterActive && g.score > 5000 && g.tick % 60 === 0) {
+            // distancePast500 in metres
+            const distPast500 = (g.score - 5000) / 10;
+            // 2% at 500m → ramps to 40% per second by ~800m+
+            const chancePerSec = Math.min(0.40, 0.02 + distPast500 * 0.0013);
+            if (Math.random() < chancePerSec) {
+              g.monsterActive = true;
+              g.monsterX = W / 2;
+              g.monsterY = -60;
+            }
           }
           // Monster chase
           if (g.monsterActive) {
@@ -502,6 +518,18 @@ export default function SkiFree() {
           ctx.textAlign = 'center';
           ctx.fillText('WARNING: Abominable Snow Monster!', W / 2, 14);
           ctx.textAlign = 'left';
+        } else if (g.score > 5000) {
+          // Subtle danger ramp indicator — flickers faster as threat probability rises
+          const distPast500 = (g.score - 5000) / 10;
+          const danger = Math.min(1, distPast500 / 300); // 0→1 over 300m past 500m
+          const flickerRate = 30 + Math.floor(danger * 60); // flicker period 30→90 ticks
+          if (g.tick % flickerRate < flickerRate / 2) {
+            ctx.fillStyle = `rgba(180,60,0,${0.5 + danger * 0.5})`;
+            ctx.font = `bold 11px "Arial", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('⚠ DANGER ZONE — Monster may appear', W / 2, 14);
+            ctx.textAlign = 'left';
+          }
         }
 
         // Dead / eaten overlay — Win95 dialog style, auto-resets after 3 seconds

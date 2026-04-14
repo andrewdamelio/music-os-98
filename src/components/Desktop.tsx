@@ -45,6 +45,8 @@ import PadMachine from '../apps/PadMachine';
 import SkiFree from '../apps/SkiFree';
 import Compressor from '../apps/Compressor';
 import EQ from '../apps/EQ';
+import MilkDrop from '../apps/MilkDrop';
+import scmpoo103 from '../assets/scmpoo103.png';
 import DesktopPet from './DesktopPet';
 
 const APP_MAP: Record<string, React.ComponentType> = {
@@ -63,6 +65,7 @@ const APP_MAP: Record<string, React.ComponentType> = {
   SkiFree,
   Compressor,
   EQ,
+  MilkDrop,
 };
 
 const DESKTOP_ICONS = [
@@ -80,7 +83,8 @@ const DESKTOP_ICONS = [
   { id: 'tempo-calc', label: 'Tempo Calc', icon: '🔢' },
   { id: 'pad-machine', label: 'Pad Machine', icon: '🎮' },
   { id: 'ski-free', label: 'SkiFree', icon: '⛷️' },
-  { id: 'screen-mate', label: 'ScreenMate', icon: '🐑' },
+  { id: 'screen-mate', label: 'Screen Mate Poo', icon: '🐑', iconImg: { src: scmpoo103, frame: 0 } },
+  { id: 'milkdrop', label: 'MilkDrop Viz', icon: '🌊' },
   { id: 'help', label: 'Help', icon: '❓' },
 ];
 
@@ -186,7 +190,17 @@ export default function Desktop() {
                 ]);
               }}
             >
-              <div className="desktop-icon-emoji">{icon.icon}</div>
+              {(icon as { iconImg?: { src: string; frame: number } }).iconImg ? (
+                <div style={{
+                  width: 32, height: 32, flexShrink: 0,
+                  backgroundImage: `url(${(icon as { iconImg: { src: string; frame: number } }).iconImg.src})`,
+                  backgroundPosition: `-${(icon as { iconImg: { src: string; frame: number } }).iconImg.frame * 32}px 0`,
+                  backgroundSize: 'auto 32px',
+                  imageRendering: 'pixelated',
+                }} />
+              ) : (
+                <div className="desktop-icon-emoji">{icon.icon}</div>
+              )}
               <div className="desktop-icon-label">{icon.label}</div>
             </div>
           ))}

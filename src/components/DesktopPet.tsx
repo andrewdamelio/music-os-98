@@ -510,7 +510,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
     setUfoDisplay({ x: ufoRef.current.x, y: ufoRef.current.y, beamH: 0, phase: 'descend', ufoFrame: 0 });
   }, []);
 
-  const triggerPooState = useCallback((state: 'poo_sleep' | 'poo_sit' | 'poo_yawn' | 'poo_pee') => {
+  const triggerPooState = useCallback((state: 'poo_sleep' | 'poo_sit' | 'poo_yawn' | 'poo_roll') => {
     if (dragRef.current) return;
     // Clear any active poo first
     pooRef.current = null;
@@ -526,7 +526,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       frames = [2, 3, 4, 3, 4, 3, 2]; sheet = scmpoo103; frameDuration = 400;
     } else if (state === 'poo_yawn') {
       frames = [5, 6, 7, 6, 7, 5]; sheet = scmpoo103; frameDuration = 320;
-    } else {
+    } else { // poo_roll
       frames = [7, 8, 9, 10, 9, 8, 7]; sheet = scmpoo108; frameDuration = 200;
     }
     pooRef.current = { sheet, frames, frameDuration, startTs };
@@ -541,7 +541,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
 
   const triggerSpecialEvent = useCallback(() => {
     if (dragRef.current) return;
-    const blocked: SheepState[] = ['climb_up', 'top_walk', 'climb_down', 'climb_prep', 'blacksheep', 'ufo_caught', 'boing', 'burn', 'bathtub', 'drag', 'fall', 'poo_sleep', 'poo_sit', 'poo_yawn', 'poo_pee'];
+    const blocked: SheepState[] = ['climb_up', 'top_walk', 'climb_down', 'climb_prep', 'blacksheep', 'ufo_caught', 'boing', 'burn', 'bathtub', 'drag', 'fall', 'poo_sleep', 'poo_sit', 'poo_yawn', 'poo_roll'];
     if (blocked.includes(stateRef.current)) return;
     if (secondSheepRef.current) return;
     if (ufoRef.current) return;
@@ -950,7 +950,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       sleep:      () => triggerPooState('poo_sleep'),
       sit:        () => triggerPooState('poo_sit'),
       yawn:       () => triggerPooState('poo_yawn'),
-      pee:        () => triggerPooState('poo_pee'),
+      roll:       () => triggerPooState('poo_roll'),
       flower:     () => {
         const x = RENDER_W + Math.random() * (window.innerWidth - RENDER_W * 3);
         const y = window.innerHeight - 40 - RENDER_H;

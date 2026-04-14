@@ -257,18 +257,9 @@ function BitDecor() {
   return (
     <svg width="60" height="48" viewBox="0 0 60 48" style={{ opacity: 0.3, flexShrink: 0 }}>
       {/* Stepped / quantized waveform */}
-      {[
-        [0,8],[0,16],[8,16],[8,32],[16,32],[16,8],[24,8],[24,40],
-        [32,40],[32,16],[40,16],[40,32],[48,32],[48,8],[56,8],[60,24],
-      ].reduce((acc: string[], [x, y], i, arr) => {
-        if (i === 0) return [`M${x} ${y}`];
-        const prev = arr[i-1];
-        return [...acc, `H${x} V${y}`];
-      }, []).join(' ') && (
+      {(
         <path
-          d={[0,8,0,16,8,16,8,32,16,32,16,8,24,8,24,40,32,40,32,16,40,16,40,32,48,32,48,8,56,8].reduce(
-            (s, v, i) => i === 0 ? `M${v}` : i % 2 === 0 ? `${s} H${v}` : `${s} V${v}`, ''
-          )}
+          d="M0,8 H0 V16 H8 V16 H8 V32 H16 V32 H16 V8 H24 V8 H24 V40 H32 V40 H32 V16 H40 V16 H40 V32 H48 V32 H48 V8 H56 V8"
           fill="none" stroke="#39ff14" strokeWidth="1.5"
         />
       )}

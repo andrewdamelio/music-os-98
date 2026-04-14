@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { audioEngine } from '../audio/engine';
+import { useOSStore } from '../store';
 
 const BANDS = [
   { label: 'LOW',  freq: 80,   type: 'lowshelf', color: '#ff4088' },
@@ -241,23 +242,14 @@ function BandControl({
 
 // ── EQ ────────────────────────────────────────────────────────────────────────
 export default function EQ() {
-  const [enabled, setEnabled] = useState(false);
-  const [gains, setGains] = useState<number[]>(BANDS.map(() => 0));
+  const { eqParams, setEQEnabled, setEQBand } = useOSStore();
+  const { enabled, gains } = eqParams;
 
-  const toggle = () => {
-    const next = !enabled;
-    setEnabled(next);
-    audioEngine.setUserEQEnabled(next);
-  };
+  const toggle = () => setEQEnabled(!enabled);
 
   const onBandChange = useCallback((idx: number, gain: number) => {
-    setGains(prev => {
-      const next = [...prev];
-      next[idx] = parseFloat(gain.toFixed(2));
-      audioEngine.setUserEQBand(idx, next[idx]);
-      return next;
-    });
-  }, []);
+    setEQBand(idx, gain);
+  }, [setEQBand]);
 
   return (
     <div className="plugin-bg" style={{

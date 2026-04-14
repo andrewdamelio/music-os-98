@@ -66,7 +66,7 @@ export default function PianoRoll() {
   const BEATS = pianoRollBeats;
   const [snapTo, setSnapTo] = useState(0.25);
   const [noteDuration, setNoteDuration] = useState(0.25);
-  const [selectedTool, setSelectedTool] = useState<'draw' | 'erase'>('draw');
+  const selectedTool = 'draw'; // draw mode toggles: click empty → add, click note → remove
   const [zoom, setZoom] = useState(1);
   const [hoveredKey, setHoveredKey] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -84,7 +84,7 @@ export default function PianoRoll() {
     const x = e.clientX - rect.left + gridRef.current.scrollLeft;
     const y = e.clientY - rect.top + gridRef.current.scrollTop;
     const beat = x / beatW;
-    const snappedBeat = Math.floor(beat / snapTo) * snapTo;
+    const snappedBeat = Math.round(beat / snapTo) * snapTo;
     const noteFromTop = Math.floor(y / NOTE_HEIGHT);
     const midi = START_NOTE + NUM_NOTES - 1 - noteFromTop;
     if (midi < START_NOTE || midi >= START_NOTE + NUM_NOTES) return;
@@ -133,18 +133,6 @@ export default function PianoRoll() {
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>PIANO ROLL</div>
         </div>
-
-        <div style={{ width: 1, height: 28, background: '#1a1b26', alignSelf: 'center' }} />
-
-        {/* Tool */}
-        <TGroup label="TOOL">
-          <TBtn active={selectedTool === 'draw'} onClick={() => setSelectedTool('draw')} accentColor="#00e5ff">
-            ✏ Draw
-          </TBtn>
-          <TBtn active={selectedTool === 'erase'} onClick={() => setSelectedTool('erase')} accentColor="#ff4466">
-            ✕ Erase
-          </TBtn>
-        </TGroup>
 
         <div style={{ width: 1, height: 28, background: '#1a1b26', alignSelf: 'center' }} />
 
@@ -320,7 +308,7 @@ export default function PianoRoll() {
           {/* Scrollable grid */}
           <div ref={gridRef} onScroll={onGridScroll} style={{
             flex: 1, overflow: 'auto', position: 'relative',
-            cursor: selectedTool === 'draw' ? 'crosshair' : 'cell',
+            cursor: 'crosshair',
           }} onClick={handleGridClick}>
             <div style={{ width: totalW, height: totalH, position: 'relative' }}>
 
@@ -373,13 +361,13 @@ export default function PianoRoll() {
                     border: `1px solid ${c.border}66`,
                     borderRadius: 2,
                     boxShadow: `0 0 6px ${c.glow}55, inset 0 1px 0 rgba(255,255,255,0.3)`,
-                    cursor: selectedTool === 'erase' ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     overflow: 'hidden',
                     zIndex: 3,
                   }}
                     onClick={e => {
                       e.stopPropagation();
-                      if (selectedTool === 'erase') removePianoNote(note.id);
+                      removePianoNote(note.id);
                     }}
                     title={noteName(note.note)}
                   >
@@ -431,7 +419,7 @@ export default function PianoRoll() {
         <span style={{ color: '#445' }}>SNAP <span style={{ color: '#556' }}>{snapTo === 0.125 ? '1/32' : snapTo === 0.25 ? '1/16' : snapTo === 0.5 ? '1/8' : '1/4'}</span></span>
         <span style={{ color: '#445' }}>LEN <span style={{ color: '#556' }}>{noteDuration === 0.125 ? '1/32' : noteDuration === 0.25 ? '1/16' : noteDuration === 0.5 ? '1/8' : noteDuration === 1 ? '1/4' : '1/2'}</span></span>
         <div style={{ flex: 1 }} />
-        <span style={{ color: '#334' }}>Click to draw · Click note to delete · Piano keys playable</span>
+        <span style={{ color: '#334' }}>Click empty cell to draw · Click note again to delete · Piano keys playable</span>
         <span style={{
           color: pianoRollEnabled ? '#39ff14' : '#334',
           textShadow: pianoRollEnabled ? '0 0 6px #39ff1466' : 'none',

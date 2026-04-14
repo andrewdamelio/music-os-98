@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { audioEngine } from '../audio/engine';
+import { useOSStore } from '../store';
 
 // ── Knob ──────────────────────────────────────────────────────────────────────
 interface KnobProps {
@@ -138,26 +139,14 @@ function GRMeter() {
 
 // ── Compressor ────────────────────────────────────────────────────────────────
 export default function Compressor() {
-  const [enabled, setEnabled] = useState(false);
-  const [threshold, setThreshold] = useState(-20);
-  const [ratio, setRatio] = useState(4);
-  const [attack, setAttack] = useState(0.003);
-  const [release, setRelease] = useState(0.25);
-  const [knee, setKnee] = useState(10);
-  const [makeup, setMakeup] = useState(1.0);
+  const { compParams, setCompParam } = useOSStore();
+  const { enabled, threshold, ratio, attack, release, knee, makeup } = compParams;
 
-  const toggle = () => {
-    const next = !enabled;
-    setEnabled(next);
-    audioEngine.setUserCompEnabled(next);
-  };
+  const toggle = () => setCompParam('enabled', !enabled);
 
-  const update = useCallback(<T extends 'threshold' | 'ratio' | 'attack' | 'release' | 'knee' | 'makeupGain'>(
-    param: T, setter: (v: number) => void
-  ) => (v: number) => {
-    setter(v);
-    audioEngine.setUserCompParam(param, v);
-  }, []);
+  const update = useCallback((param: 'threshold' | 'ratio' | 'attack' | 'release' | 'knee' | 'makeup') =>
+    (v: number) => setCompParam(param, v),
+  [setCompParam]);
 
   // dB display of makeup gain
   const makeupDb = makeup <= 0 ? '-∞' : (20 * Math.log10(makeup)).toFixed(1);
@@ -210,42 +199,42 @@ export default function Compressor() {
             value={threshold} min={-60} max={0} step={0.5}
             format={v => `${v.toFixed(0)}dB`}
             color={enabled ? '#00e5ff' : '#334'}
-            onChange={update('threshold', setThreshold)}
+            onChange={update('threshold')}
           />
           <Knob
             label="RATIO"
             value={ratio} min={1} max={20} step={0.5}
             format={v => `${v.toFixed(1)}:1`}
             color={enabled ? '#bf00ff' : '#334'}
-            onChange={update('ratio', setRatio)}
+            onChange={update('ratio')}
           />
           <Knob
             label="ATTACK"
             value={attack} min={0.001} max={0.5} step={0.001}
             format={v => v < 0.01 ? `${(v * 1000).toFixed(1)}ms` : `${(v * 1000).toFixed(0)}ms`}
             color={enabled ? '#39ff14' : '#334'}
-            onChange={update('attack', setAttack)}
+            onChange={update('attack')}
           />
           <Knob
             label="RELEASE"
             value={release} min={0.05} max={2} step={0.01}
             format={v => v < 1 ? `${(v * 1000).toFixed(0)}ms` : `${v.toFixed(2)}s`}
             color={enabled ? '#ff4088' : '#334'}
-            onChange={update('release', setRelease)}
+            onChange={update('release')}
           />
           <Knob
             label="KNEE"
             value={knee} min={0} max={40} step={0.5}
             format={v => `${v.toFixed(0)}dB`}
             color={enabled ? '#ffb300' : '#334'}
-            onChange={update('knee', setKnee)}
+            onChange={update('knee')}
           />
           <Knob
             label="MAKEUP"
             value={makeup} min={0.25} max={8} step={0.01}
             format={() => `${makeupDb}dB`}
             color={enabled ? '#ff8844' : '#334'}
-            onChange={update('makeupGain', setMakeup)}
+            onChange={update('makeup')}
           />
         </div>
       </div>
