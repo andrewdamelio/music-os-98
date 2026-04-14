@@ -347,7 +347,11 @@ class AudioEngine {
     for (const band of this.userEQBands) {
       const mag = new Float32Array(freqArray.length);
       const ph = new Float32Array(freqArray.length);
-      band.getFrequencyResponse(freqArray, mag, ph);
+      band.getFrequencyResponse(
+        freqArray as Float32Array<ArrayBuffer>,
+        mag as Float32Array<ArrayBuffer>,
+        ph as Float32Array<ArrayBuffer>,
+      );
       for (let i = 0; i < combined.length; i++) combined[i] *= mag[i];
     }
     return { mag: combined, phase: phaseOut };
