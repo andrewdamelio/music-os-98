@@ -356,7 +356,7 @@ export default function Defrag() {
         </select>
       </div>
 
-      {/* Cluster map — sunken white box, grows to fill available space */}
+      {/* Cluster map — fills all available vertical space */}
       <div style={{
         border: '2px solid',
         borderColor: '#808080 #ffffff #ffffff #808080',
@@ -364,14 +364,12 @@ export default function Defrag() {
         padding: 2,
         flex: 1,
         overflow: 'hidden',
-        display: 'flex',
-        alignItems: 'flex-start',
       }}>
         <canvas
           ref={canvasRef}
           width={CANVAS_W}
           height={CANVAS_H}
-          style={{ display: 'block' }}
+          style={{ display: 'block', width: '100%', height: '100%', imageRendering: 'pixelated' }}
         />
       </div>
 

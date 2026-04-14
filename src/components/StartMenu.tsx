@@ -40,6 +40,8 @@ const MENU: TopItem[] = [
     items: [
       { label: 'Mixer',        icon: '🎚️', appId: 'mixer' },
       { label: 'FX Rack',      icon: '🎛️', appId: 'fx-rack' },
+      { label: 'Compressor',  icon: '🔊', appId: 'compressor' },
+      { label: 'Parametric EQ', icon: '🎚️', appId: 'eq' },
       { label: 'Oscilloscope', icon: '📊', appId: 'oscilloscope' },
     ],
   },
@@ -61,8 +63,7 @@ const MENU: TopItem[] = [
   {
     kind: 'category', label: 'System', icon: '💻',
     items: [
-      { label: 'Disk Defragmenter', icon: '💽', appId: 'defrag' },
-      { label: 'Help & Manual',     icon: '❓', appId: 'help' },
+      { label: 'Help & Manual', icon: '❓', appId: 'help' },
     ],
   },
   { kind: 'separator' },
@@ -112,13 +113,17 @@ export default function StartMenu() {
             );
           }
 
-          // category with flyout
+          // category with flyout — opens on hover
           const isOpen = openCategory === item.label;
           return (
-            <div key={i} style={{ position: 'relative' }}>
+            <div
+              key={i}
+              style={{ position: 'relative' }}
+              onMouseEnter={() => setOpenCategory(item.label)}
+              onMouseLeave={() => setOpenCategory(null)}
+            >
               <div
                 className={`start-menu-item${isOpen ? ' active' : ''}`}
-                onClick={() => setOpenCategory(isOpen ? null : item.label)}
                 style={{ justifyContent: 'space-between' }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

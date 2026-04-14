@@ -60,11 +60,12 @@ export const APPS: AppDef[] = [
   { id: 'file-browser', title: 'Sample Library', icon: '📁', component: 'FileBrowser', defaultSize: { w: 540, h: 460 }, singleton: true },
   { id: 'tempo-calc', title: 'Tempo Calc', icon: '🔢', component: 'TempoCalc', defaultSize: { w: 340, h: 400 }, singleton: true },
   { id: 'help', title: 'Help & Manual', icon: '❓', component: 'Help', defaultSize: { w: 620, h: 520 }, singleton: true },
-  { id: 'oscilloscope', title: 'Oscilloscope', icon: '📊', component: 'Oscilloscope', defaultSize: { w: 460, h: 340 }, singleton: true },
+  { id: 'oscilloscope', title: 'Oscilloscope', icon: '📊', component: 'Oscilloscope', defaultSize: { w: 820, h: 380 }, singleton: true },
+  { id: 'compressor', title: 'Compressor', icon: '🔊', component: 'Compressor', defaultSize: { w: 560, h: 320 }, singleton: true },
+  { id: 'eq', title: 'Parametric EQ', icon: '🎛️', component: 'EQ', defaultSize: { w: 580, h: 420 }, singleton: true },
   { id: 'pad-machine', title: 'Pad Machine', icon: '🎮', component: 'PadMachine', defaultSize: { w: 720, h: 540 }, singleton: true },
   { id: 'ski-free', title: 'SkiFree', icon: '⛷️', component: 'SkiFree', defaultSize: { w: 600, h: 480 }, singleton: true },
   { id: 'screen-mate', title: 'ScreenMate 🐑', icon: '🐑', component: 'ScreenMate', defaultSize: { w: 400, h: 300 }, singleton: false },
-  { id: 'defrag', title: 'Disk Defragmenter', icon: '💽', component: 'Defrag', defaultSize: { w: 560, h: 500 }, singleton: true },
 ];
 
 let zCounter = 100;

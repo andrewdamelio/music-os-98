@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import sheepSprite from '../assets/esheep64.png';
 import scmpoo110 from '../assets/scmpoo110.png';
 import scmpoo111 from '../assets/scmpoo111.png';
+import scmpoo103 from '../assets/scmpoo103.png';
+import scmpoo108 from '../assets/scmpoo108.png';
 
 const TILE_W = 60;
 const TILE_H = 64;
@@ -72,7 +74,11 @@ type SheepState =
   | 'top_walk'                       // walk across the top upside-down
   | 'climb_down'                     // descend the other side
   | 'blacksheep'                     // encounter animation when second sheep arrives
-  | 'ufo_caught';                    // being beamed up by UFO
+  | 'ufo_caught'                     // being beamed up by UFO
+  | 'poo_sleep'                      // scmpoo103 frames 0-1: sleeping zzz
+  | 'poo_sit'                        // scmpoo103 frames 2-4: sitting and staring
+  | 'poo_yawn'                       // scmpoo103 frames 5-7: big yawn
+  | 'poo_roll';                      // scmpoo108 frames 7-10: rolling around
 
 interface AnimDef {
   frames: { idx: number; ms: number }[];
@@ -87,13 +93,16 @@ const ANIMS: Record<SheepState, AnimDef> = {
     loop: false,
     next: () => {
       const r = Math.random();
-      if (r < 0.20) return 'walk';
-      if (r < 0.32) return 'run_begin';
-      if (r < 0.44) return 'graze';
-      if (r < 0.55) return 'sleep1a';
-      if (r < 0.63) return 'sleep2a';
-      if (r < 0.70) return 'bathtub';
-      if (r < 0.76) return 'sit';
+      if (r < 0.18) return 'walk';
+      if (r < 0.30) return 'run_begin';
+      if (r < 0.40) return 'graze';
+      if (r < 0.50) return 'sleep1a';
+      if (r < 0.58) return 'sleep2a';
+      if (r < 0.64) return 'sit';
+      if (r < 0.72) return 'poo_sit';
+      if (r < 0.80) return 'poo_yawn';
+      if (r < 0.88) return 'poo_sleep';
+      if (r < 0.94) return 'poo_roll';
       return 'idle';
     },
   },
@@ -226,6 +235,39 @@ const ANIMS: Record<SheepState, AnimDef> = {
     frames: [{ idx: 133, ms: 80 }, { idx: 46, ms: 80 }],
     loop: true, vx: 0, next: () => 'fall',
   },
+  // ── Scmpoo companion animations ────────────────────────────────────────────
+  poo_sleep: {
+    // scmpoo103 frames 0-1: sleeping. Duration ~3s
+    frames: [
+      { idx: 3, ms: 500 }, { idx: 3, ms: 500 }, { idx: 3, ms: 500 },
+      { idx: 3, ms: 500 }, { idx: 3, ms: 500 }, { idx: 3, ms: 500 },
+    ],
+    loop: false, vx: 0, next: () => 'idle',
+  },
+  poo_sit: {
+    // scmpoo103 frames 2-4: sitting and staring. Duration ~2.8s
+    frames: [
+      { idx: 3, ms: 400 }, { idx: 3, ms: 400 }, { idx: 3, ms: 400 },
+      { idx: 3, ms: 400 }, { idx: 3, ms: 400 }, { idx: 3, ms: 400 }, { idx: 3, ms: 400 },
+    ],
+    loop: false, vx: 0, next: () => 'idle',
+  },
+  poo_yawn: {
+    // scmpoo103 frames 5-7: yawning. Duration ~2s
+    frames: [
+      { idx: 3, ms: 300 }, { idx: 3, ms: 300 }, { idx: 3, ms: 300 },
+      { idx: 3, ms: 400 }, { idx: 3, ms: 300 }, { idx: 3, ms: 350 },
+    ],
+    loop: false, vx: 0, next: () => 'idle',
+  },
+  poo_roll: {
+    // scmpoo108 frames 7-10: rolling. Duration ~1.4s
+    frames: [
+      { idx: 3, ms: 200 }, { idx: 3, ms: 200 }, { idx: 3, ms: 200 },
+      { idx: 3, ms: 200 }, { idx: 3, ms: 200 }, { idx: 3, ms: 200 }, { idx: 3, ms: 200 },
+    ],
+    loop: false, vx: 0, next: () => 'walk',
+  },
 };
 
 const LOOP_CYCLES: Partial<Record<SheepState, [number, number]>> = {
@@ -299,6 +341,10 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
   const [ufoDisplay, setUfoDisplay] = useState<UfoDisplay | null>(null);
   const [flipY, setFlipY] = useState(false); // used during top_walk
 
+  // ── Scmpoo companion animations ─────────────────────────────────────────
+  const pooRef = useRef<{ sheet: string; frames: number[]; frameDuration: number; startTs: number } | null>(null);
+  const [pooDisplay, setPooDisplay] = useState<{ sheet: string; frame: number; x: number; y: number } | null>(null);
+
   const rafRef = useRef<number>(0);
   const lastTickRef = useRef(0);
   const nextFrameTimeRef = useRef(0);
@@ -349,6 +395,35 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       const btY = H - S_FH;
       bathtubPropRef.current = { x: btX, y: btY, frame: 2, startTs: performance.now() };
       setBathtubProp({ x: btX, y: btY, frame: 2 });
+    }
+
+    // Scmpoo companion animations — set up poo display or clear it
+    const POO_STATES: SheepState[] = ['poo_sleep', 'poo_sit', 'poo_yawn', 'poo_roll'];
+    // Clear poo display when leaving a poo state
+    if (!POO_STATES.includes(resolved) && POO_STATES.includes(stateRef.current as SheepState)) {
+      pooRef.current = null;
+      setPooDisplay(null);
+    }
+    if (POO_STATES.includes(resolved)) {
+      const pos = posRef.current;
+      const startTs = performance.now();
+      if (resolved === 'poo_sleep') {
+        pooRef.current = { sheet: scmpoo103, frames: [0, 1, 0, 1, 0, 1], frameDuration: 500, startTs };
+      } else if (resolved === 'poo_sit') {
+        pooRef.current = { sheet: scmpoo103, frames: [2, 3, 4, 3, 4, 3, 2], frameDuration: 400, startTs };
+      } else if (resolved === 'poo_yawn') {
+        pooRef.current = { sheet: scmpoo103, frames: [5, 6, 7, 6, 7, 5], frameDuration: 320, startTs };
+      } else if (resolved === 'poo_roll') {
+        pooRef.current = { sheet: scmpoo108, frames: [7, 8, 9, 10, 9, 8, 7], frameDuration: 200, startTs };
+      }
+      // Show poo sprite aligned with sheep position (centred, bottom-aligned)
+      const px = pos.x - Math.round((S_FW - RENDER_W) / 2);
+      const py = pos.y - (S_FH - RENDER_H);
+      setPooDisplay({ sheet: pooRef.current!.sheet, frame: pooRef.current!.frames[0], x: px, y: py });
+    } else if (POO_STATES.includes(stateRef.current)) {
+      // Transitioning OUT of a poo state — clear it
+      pooRef.current = null;
+      setPooDisplay(null);
     }
   }, []);
 
@@ -419,10 +494,14 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
   const triggerAlienEncounter = useCallback(() => {
     const pos = posRef.current;
     const W = window.innerWidth;
+    // Land alien 60-90px to one side of the sheep so they're near but not overlapping
+    const side = Math.random() < 0.5 ? 1 : -1;
+    const offsetX = 60 + Math.random() * 30;
+    const alienLandX = Math.max(S_FW, Math.min(W - S_FW * 2, pos.x + side * offsetX));
     ufoRef.current = {
       x: Math.random() * (W - S_FW),
       y: -S_FH,
-      targetX: pos.x - 20,
+      targetX: alienLandX, // UFO hovers over alien's landing spot
       phase: 'descend',
       isEncounter: true,
       alienY: 0,
@@ -431,9 +510,38 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
     setUfoDisplay({ x: ufoRef.current.x, y: ufoRef.current.y, beamH: 0, phase: 'descend', ufoFrame: 0 });
   }, []);
 
+  const triggerPooState = useCallback((state: 'poo_sleep' | 'poo_sit' | 'poo_yawn' | 'poo_pee') => {
+    if (dragRef.current) return;
+    // Clear any active poo first
+    pooRef.current = null;
+    setPooDisplay(null);
+    const pos = posRef.current;
+    const startTs = performance.now();
+    let frames: number[];
+    let sheet: string;
+    let frameDuration: number;
+    if (state === 'poo_sleep') {
+      frames = [0, 1, 0, 1, 0, 1]; sheet = scmpoo103; frameDuration = 500;
+    } else if (state === 'poo_sit') {
+      frames = [2, 3, 4, 3, 4, 3, 2]; sheet = scmpoo103; frameDuration = 400;
+    } else if (state === 'poo_yawn') {
+      frames = [5, 6, 7, 6, 7, 5]; sheet = scmpoo103; frameDuration = 320;
+    } else {
+      frames = [7, 8, 9, 10, 9, 8, 7]; sheet = scmpoo108; frameDuration = 200;
+    }
+    pooRef.current = { sheet, frames, frameDuration, startTs };
+    const px = pos.x - Math.round((S_FW - RENDER_W) / 2);
+    const py = pos.y - (S_FH - RENDER_H);
+    setPooDisplay({ sheet, frame: frames[0], x: px, y: py });
+    stateRef.current = state;
+    velRef.current.x = 0;
+    frameIdxRef.current = 0;
+    loopCycleRef.current = 0;
+  }, []);
+
   const triggerSpecialEvent = useCallback(() => {
     if (dragRef.current) return;
-    const blocked: SheepState[] = ['climb_up', 'top_walk', 'climb_down', 'climb_prep', 'blacksheep', 'ufo_caught', 'boing', 'burn', 'bathtub', 'drag', 'fall'];
+    const blocked: SheepState[] = ['climb_up', 'top_walk', 'climb_down', 'climb_prep', 'blacksheep', 'ufo_caught', 'boing', 'burn', 'bathtub', 'drag', 'fall', 'poo_sleep', 'poo_sit', 'poo_yawn', 'poo_pee'];
     if (blocked.includes(stateRef.current)) return;
     if (secondSheepRef.current) return;
     if (ufoRef.current) return;
@@ -470,7 +578,8 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       const ufoSaucerFrame = Math.floor(ts / 120) % 6;
       if (ufo.phase === 'descend') {
         // UFO hovers at ~25% down the screen — long dramatic beam
-        const tx = pos.x - 20;
+        // Encounter: hover over alien landing spot (offset from sheep). Abduction: hover over sheep.
+        const tx = ufo.isEncounter ? ufo.targetX : pos.x - 20;
         const ty = H * 0.25;
         ufo.x += (tx - ufo.x) * 0.04;
         ufo.y += (ty - ufo.y) * 0.04;
@@ -571,6 +680,24 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       if (elapsed > 3500) {
         bathtubPropRef.current = null;
         setBathtubProp(null);
+      }
+    }
+
+    // ── Scmpoo companion animation update ─────────────────────────────────
+    const poo = pooRef.current;
+    if (poo) {
+      const elapsed = ts - poo.startTs;
+      const totalDuration = poo.frames.length * poo.frameDuration;
+      if (elapsed >= totalDuration) {
+        // Animation finished — clear companion display
+        pooRef.current = null;
+        setPooDisplay(null);
+      } else {
+        const frameIdx = Math.floor(elapsed / poo.frameDuration);
+        const frame = poo.frames[frameIdx];
+        const px = pos.x - Math.round((S_FW - RENDER_W) / 2);
+        const py = pos.y - (S_FH - RENDER_H);
+        setPooDisplay({ sheet: poo.sheet, frame, x: px, y: py });
       }
     }
 
@@ -820,6 +947,10 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       blacksheep: triggerBlacksheep,
       ufo:        triggerUFO,
       alien:      triggerAlienEncounter,
+      sleep:      () => triggerPooState('poo_sleep'),
+      sit:        () => triggerPooState('poo_sit'),
+      yawn:       () => triggerPooState('poo_yawn'),
+      pee:        () => triggerPooState('poo_pee'),
       flower:     () => {
         const x = RENDER_W + Math.random() * (window.innerWidth - RENDER_W * 3);
         const y = window.innerHeight - 40 - RENDER_H;
@@ -837,11 +968,15 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
     console.log('  sheep.blacksheep() — second sheep encounter');
     console.log('  sheep.ufo()        — UFO abduction');
     console.log('  sheep.alien()      — alien encounter');
+    console.log('  sheep.sleep()      — sleeping zzz (scmpoo103)');
+    console.log('  sheep.sit()        — sitting and staring (scmpoo103)');
+    console.log('  sheep.yawn()       — big yawn (scmpoo103)');
+    console.log('  sheep.pee()        — peeing (scmpoo108)');
     console.log('  sheep.flower()     — spawn a flower');
     console.log('  sheep.jump()       — jump');
-    console.log('  sheep.random()     — random event');
+    console.log('  sheep.random()     — random special event');
     return () => { delete (window as any).sheep; };
-  }, [visible, triggerBurn, triggerBoing, triggerClimb, triggerBlacksheep, triggerUFO, triggerAlienEncounter, triggerSpecialEvent]);
+  }, [visible, triggerBurn, triggerBoing, triggerClimb, triggerBlacksheep, triggerUFO, triggerAlienEncounter, triggerPooState, triggerSpecialEvent]);
 
   // Special events timer
   useEffect(() => {
@@ -964,6 +1099,14 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       {/* Bathtub prop — renders on top of sheep so sheep appears inside tub */}
       {bathtubProp && (
         <div style={scmpooStyle(scmpoo110, bathtubProp.frame, bathtubProp.x, bathtubProp.y, 1)} />
+      )}
+
+      {/* Scmpoo companion — overlays sheep during poo_* animations */}
+      {pooDisplay && (
+        <div style={{
+          ...scmpooStyle(pooDisplay.sheet, pooDisplay.frame, pooDisplay.x, pooDisplay.y, 1),
+          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+        }} />
       )}
     </div>
   );

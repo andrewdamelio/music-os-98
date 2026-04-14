@@ -119,6 +119,21 @@ class AudioEngine {
   masterFaderNode: GainNode | null = null;
   masterMuteNode: GainNode | null = null;
 
+  // User insert: Compressor (between masterMuteNode and masterGain)
+  userCompEnabled = false;
+  userCompNode: DynamicsCompressorNode | null = null;
+  userCompMakeup: GainNode | null = null;
+  userCompWet: GainNode | null = null;
+  userCompBypass: GainNode | null = null;
+  userCompOutput: GainNode | null = null;
+
+  // User insert: EQ — 5 bands (lowshelf, peaking×3, highshelf) in series after comp
+  userEQEnabled = false;
+  userEQBands: BiquadFilterNode[] = [];
+  userEQWet: GainNode | null = null;
+  userEQBypass: GainNode | null = null;
+  userEQOutput: GainNode | null = null;
+
   // Piano roll
   pianoRollNotes: { note: number; beat: number; duration: number; channel: number }[] = [];
   pianoRollEnabled = false;
@@ -141,7 +156,8 @@ class AudioEngine {
   stepCallbacks: ((step: number) => void)[] = [];
 
   // Piano roll scheduler
-  pianoRollBeat = 0;
+  pianoRollBeat = 0;        // scheduling counter (runs ahead)
+  pianoRollDisplayBeat = 0; // display counter (fires at audio time, used by UI)
   pianoRollBeatsPerLoop = 8;
   pianoRollScheduledAhead = 0;
 
@@ -174,7 +190,55 @@ class AudioEngine {
     this.masterMuteNode.gain.value = 1;
 
     this.masterFaderNode.connect(this.masterMuteNode);
-    this.masterMuteNode.connect(this.masterGain);
+
+    // ── User Compressor insert ──────────────────────────────────────────────
+    this.userCompNode = this.ctx.createDynamicsCompressor();
+    this.userCompNode.threshold.value = -20;
+    this.userCompNode.knee.value = 10;
+    this.userCompNode.ratio.value = 4;
+    this.userCompNode.attack.value = 0.003;
+    this.userCompNode.release.value = 0.25;
+    this.userCompMakeup = this.ctx.createGain();
+    this.userCompMakeup.gain.value = 1.0;
+    this.userCompWet = this.ctx.createGain();
+    this.userCompWet.gain.value = 0;   // bypassed by default
+    this.userCompBypass = this.ctx.createGain();
+    this.userCompBypass.gain.value = 1; // bypass on by default
+    this.userCompOutput = this.ctx.createGain();
+    this.masterMuteNode.connect(this.userCompNode);
+    this.userCompNode.connect(this.userCompMakeup);
+    this.userCompMakeup.connect(this.userCompWet);
+    this.masterMuteNode.connect(this.userCompBypass);
+    this.userCompWet.connect(this.userCompOutput);
+    this.userCompBypass.connect(this.userCompOutput);
+
+    // ── User EQ insert (5 bands in series) ─────────────────────────────────
+    const eqFreqs = [80, 250, 1000, 4000, 12000];
+    const eqTypes: BiquadFilterType[] = ['lowshelf', 'peaking', 'peaking', 'peaking', 'highshelf'];
+    this.userEQWet = this.ctx.createGain();
+    this.userEQWet.gain.value = 0;
+    this.userEQBypass = this.ctx.createGain();
+    this.userEQBypass.gain.value = 1;
+    this.userEQOutput = this.ctx.createGain();
+    eqFreqs.forEach((freq, i) => {
+      const band = this.ctx!.createBiquadFilter();
+      band.type = eqTypes[i];
+      band.frequency.value = freq;
+      band.gain.value = 0;
+      band.Q.value = 1;
+      if (i === 0) {
+        this.userCompOutput!.connect(band);
+      } else {
+        this.userEQBands[i - 1].connect(band);
+      }
+      this.userEQBands.push(band);
+    });
+    this.userEQBands[4].connect(this.userEQWet);
+    this.userCompOutput.connect(this.userEQBypass);
+    this.userEQWet.connect(this.userEQOutput);
+    this.userEQBypass.connect(this.userEQOutput);
+    this.userEQOutput.connect(this.masterGain);
+
     this.masterGain.connect(this.masterCompressor);
     this.masterCompressor.connect(this.masterAnalyser);
     this.masterAnalyser.connect(this.ctx.destination);
@@ -229,6 +293,64 @@ class AudioEngine {
   setChannelSend(channelIdx: number, amount: number) {
     const g = this.mixerSendGains[channelIdx];
     if (g) g.gain.value = Math.max(0, Math.min(1, amount));
+  }
+
+  // ── User Compressor ──────────────────────────────────────────────────────
+
+  setUserCompEnabled(enabled: boolean) {
+    if (!this.ctx) return;
+    this.userCompEnabled = enabled;
+    const t = this.ctx.currentTime;
+    this.userCompWet?.gain.setTargetAtTime(enabled ? 1 : 0, t, 0.015);
+    this.userCompBypass?.gain.setTargetAtTime(enabled ? 0 : 1, t, 0.015);
+  }
+
+  setUserCompParam(param: 'threshold' | 'ratio' | 'attack' | 'release' | 'knee' | 'makeupGain', value: number) {
+    if (!this.ctx || !this.userCompNode) return;
+    const t = this.ctx.currentTime;
+    switch (param) {
+      case 'threshold': this.userCompNode.threshold.setTargetAtTime(value, t, 0.01); break;
+      case 'ratio':     this.userCompNode.ratio.setTargetAtTime(value, t, 0.01); break;
+      case 'attack':    this.userCompNode.attack.setTargetAtTime(value, t, 0.01); break;
+      case 'release':   this.userCompNode.release.setTargetAtTime(value, t, 0.01); break;
+      case 'knee':      this.userCompNode.knee.setTargetAtTime(value, t, 0.01); break;
+      case 'makeupGain': this.userCompMakeup?.gain.setTargetAtTime(value, t, 0.01); break;
+    }
+  }
+
+  getUserCompReduction(): number {
+    return this.userCompNode?.reduction ?? 0;
+  }
+
+  // ── User EQ ──────────────────────────────────────────────────────────────
+
+  setUserEQEnabled(enabled: boolean) {
+    if (!this.ctx) return;
+    this.userEQEnabled = enabled;
+    const t = this.ctx.currentTime;
+    this.userEQWet?.gain.setTargetAtTime(enabled ? 1 : 0, t, 0.015);
+    this.userEQBypass?.gain.setTargetAtTime(enabled ? 0 : 1, t, 0.015);
+  }
+
+  setUserEQBand(bandIdx: number, gainDb: number, freq?: number, q?: number) {
+    const band = this.userEQBands[bandIdx];
+    if (!band || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    band.gain.setTargetAtTime(gainDb, t, 0.01);
+    if (freq !== undefined) band.frequency.setTargetAtTime(freq, t, 0.01);
+    if (q !== undefined) band.Q.setTargetAtTime(q, t, 0.01);
+  }
+
+  getUserEQFrequencyResponse(freqArray: Float32Array): { mag: Float32Array; phase: Float32Array } {
+    const combined = new Float32Array(freqArray.length).fill(1);
+    const phaseOut = new Float32Array(freqArray.length);
+    for (const band of this.userEQBands) {
+      const mag = new Float32Array(freqArray.length);
+      const ph = new Float32Array(freqArray.length);
+      band.getFrequencyResponse(freqArray, mag, ph);
+      for (let i = 0; i < combined.length; i++) combined[i] *= mag[i];
+    }
+    return { mag: combined, phase: phaseOut };
   }
 
   setupFX() {
@@ -725,6 +847,7 @@ class AudioEngine {
     this.stepIndex = 0;
     this.nextNoteTime = this.ctx.currentTime + 0.05;
     this.pianoRollBeat = 0;
+    this.pianoRollDisplayBeat = 0;
     this.scheduler();
   }
 
@@ -853,6 +976,11 @@ class AudioEngine {
         }
       });
     }
+    // Update display beat at audio time (not scheduler time) so playhead stays in sync
+    const capturedDisplayBeat = this.pianoRollBeat;
+    setTimeout(() => {
+      if (this.isPlaying) this.pianoRollDisplayBeat = capturedDisplayBeat;
+    }, delay);
     // Advance piano roll counter (independent of drum loop length)
     this.pianoRollBeat = (this.pianoRollBeat + 1) % (this.pianoRollBeats * 4);
   }

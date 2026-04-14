@@ -43,7 +43,8 @@ import Help from '../apps/Help';
 import Oscilloscope from '../apps/Oscilloscope';
 import PadMachine from '../apps/PadMachine';
 import SkiFree from '../apps/SkiFree';
-import Defrag from '../apps/Defrag';
+import Compressor from '../apps/Compressor';
+import EQ from '../apps/EQ';
 import DesktopPet from './DesktopPet';
 
 const APP_MAP: Record<string, React.ComponentType> = {
@@ -60,7 +61,8 @@ const APP_MAP: Record<string, React.ComponentType> = {
   Oscilloscope,
   PadMachine,
   SkiFree,
-  Defrag,
+  Compressor,
+  EQ,
 };
 
 const DESKTOP_ICONS = [
@@ -73,11 +75,12 @@ const DESKTOP_ICONS = [
   { id: 'tape-deck', label: 'Tape Deck', icon: '📼' },
   { id: 'file-browser', label: 'Sample Library', icon: '📁' },
   { id: 'oscilloscope', label: 'Oscilloscope', icon: '📊' },
+  { id: 'compressor', label: 'Compressor', icon: '🔊' },
+  { id: 'eq', label: 'Parametric EQ', icon: '🎛️' },
   { id: 'tempo-calc', label: 'Tempo Calc', icon: '🔢' },
   { id: 'pad-machine', label: 'Pad Machine', icon: '🎮' },
   { id: 'ski-free', label: 'SkiFree', icon: '⛷️' },
   { id: 'screen-mate', label: 'ScreenMate', icon: '🐑' },
-  { id: 'defrag', label: 'Disk Defrag', icon: '💽' },
   { id: 'help', label: 'Help', icon: '❓' },
 ];
 

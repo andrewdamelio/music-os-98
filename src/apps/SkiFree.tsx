@@ -243,7 +243,7 @@ export default function SkiFree() {
   const resetGame = useCallback(() => {
     const g = gameRef.current;
     g.skierX = W / 2;
-    g.skierY = H * 0.35;
+    g.skierY = H * 0.38;
     g.velX = 0;
     g.dir = 0;
     g.scrollY = 0;
@@ -298,44 +298,37 @@ export default function SkiFree() {
       const g = gameRef.current;
       const state = stateRef.current;
 
-      // ── Draw background ──
-      const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, '#c8e8f8');
-      grad.addColorStop(0.3, '#e8f4ff');
-      grad.addColorStop(1, '#f4faff');
-      ctx.fillStyle = grad;
+      // ── Draw background — pure Win95 white snow ──
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, W, H);
 
-      // Subtle ski tracks
-      ctx.strokeStyle = 'rgba(180,210,240,0.5)';
-      ctx.lineWidth = 1;
-      const trackOffset = g.scrollY % 40;
-      for (let y = -trackOffset; y < H; y += 40) {
-        ctx.beginPath(); ctx.moveTo(W / 2 - 6, y); ctx.lineTo(W / 2 - 6, y + 30); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(W / 2 + 6, y); ctx.lineTo(W / 2 + 6, y + 30); ctx.stroke();
-      }
-
       if (state === 'title') {
-        // Title screen
-        ctx.fillStyle = 'rgba(0,30,80,0.6)';
-        ctx.fillRect(W / 2 - 160, H / 2 - 70, 320, 140);
-        ctx.strokeStyle = '#aaccff';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(W / 2 - 160, H / 2 - 70, 320, 140);
+        // Win95-style title dialog
+        const bx = W / 2 - 160, by = H / 2 - 80, bw = 320, bh = 160;
+        ctx.fillStyle = '#c0c0c0';
+        ctx.fillRect(bx, by, bw, bh);
+        // Raised border
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(bx, by + bh); ctx.lineTo(bx, by); ctx.lineTo(bx + bw, by); ctx.stroke();
+        ctx.strokeStyle = '#808080';
+        ctx.beginPath(); ctx.moveTo(bx + bw, by); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx, by + bh); ctx.stroke();
+        // Title bar
+        ctx.fillStyle = '#000080';
+        ctx.fillRect(bx + 2, by + 2, bw - 4, 18);
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px monospace';
+        ctx.font = 'bold 11px "Arial", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('⛷️ SkiFree', W / 2, H / 2 - 20);
-        ctx.font = '14px monospace';
-        ctx.fillStyle = '#aaddff';
-        ctx.fillText('Arrow keys or A/D to steer', W / 2, H / 2 + 15);
-        ctx.fillStyle = '#ffcc44';
-        ctx.font = '13px monospace';
-        ctx.fillText('Press SPACE or click to start', W / 2, H / 2 + 45);
+        ctx.fillText('SkiFree', bx + bw / 2, by + 15);
+        // Body text
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 20px "Arial", sans-serif';
+        ctx.fillText('⛷  SkiFree', bx + bw / 2, by + 60);
+        ctx.font = '11px "Arial", sans-serif';
+        ctx.fillText('Use arrow keys or A / D to steer', bx + bw / 2, by + 85);
+        ctx.fillText('Press SPACE or click to start', bx + bw / 2, by + 102);
         if (highScore > 0) {
-          ctx.fillStyle = '#88ffcc';
-          ctx.font = '11px monospace';
-          ctx.fillText(`High Score: ${highScore}m`, W / 2, H / 2 + 68);
+          ctx.fillStyle = '#000080';
+          ctx.fillText(`Best: ${highScore}m`, bx + bw / 2, by + 122);
         }
         ctx.textAlign = 'left';
         return;
@@ -411,9 +404,19 @@ export default function SkiFree() {
             if (o.type === 'flag')  { continue; } // flags are just decoration
             const hit = sRight > o.x - hw && sLeft < o.x + hw && sBot > o.y - hh && sTop < o.y + hh;
             if (hit) {
+              // Crash = end of run, same as being eaten
               g.crashed = true;
-              g.crashTimer = 120;
+              g.crashTimer = 999; // keep X visible until reset
               spawnParticles(g.skierX, g.skierY);
+              stateRef.current = 'dead';
+              setDisplayState('dead');
+              const sc = Math.floor(g.score / 10);
+              setScore(sc);
+              if (sc > highScore) {
+                setHighScore(sc);
+                localStorage.setItem('skifree_hi', String(sc));
+              }
+              g.restartTimer = 180; // 3s auto-reset
               break;
             }
           }
@@ -437,6 +440,7 @@ export default function SkiFree() {
                 setHighScore(sc);
                 localStorage.setItem('skifree_hi', String(sc));
               }
+              g.restartTimer = 180; // 3 seconds at 60fps
             }
           }
         }
@@ -479,47 +483,86 @@ export default function SkiFree() {
         }
         ctx.globalAlpha = 1;
 
-        // HUD
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        ctx.fillRect(6, 6, 110, 22);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 13px monospace';
-        ctx.fillText(`⛷️ ${Math.floor(g.score / 10)}m`, 12, 22);
+        // Win95-style HUD — score in top-left gray bar
+        ctx.fillStyle = '#c0c0c0';
+        ctx.fillRect(0, 0, W, 20);
+        ctx.strokeStyle = '#808080'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(W, 20); ctx.stroke();
+        ctx.fillStyle = '#000000';
+        ctx.font = '11px "Arial", sans-serif';
+        ctx.fillText(`Distance: ${Math.floor(g.score / 10)} m`, 8, 14);
+        if (highScore > 0) {
+          ctx.fillText(`Best: ${highScore} m`, 140, 14);
+        }
 
         if (g.monsterActive) {
-          ctx.fillStyle = 'rgba(0,0,0,0.45)';
-          ctx.fillRect(W / 2 - 60, 6, 120, 22);
-          ctx.fillStyle = '#ff4444';
-          ctx.font = 'bold 11px monospace';
+          // Win95-style warning in red
+          ctx.fillStyle = '#ff0000';
+          ctx.font = 'bold 11px "Arial", sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('⚠️ MONSTER INCOMING!', W / 2, 22);
+          ctx.fillText('WARNING: Abominable Snow Monster!', W / 2, 14);
           ctx.textAlign = 'left';
         }
 
-        // Dead / eaten overlay — wait for player to click or press space
+        // Dead / eaten overlay — Win95 dialog style, auto-resets after 3 seconds
         if (state === 'dead' || state === 'eaten') {
+          // Auto-restart countdown
+          if (g.restartTimer > 0) {
+            g.restartTimer--;
+            if (g.restartTimer === 0) {
+              resetGame();
+              stateRef.current = 'playing';
+              setDisplayState('playing');
+              return;
+            }
+          }
+
           const sc = Math.floor(g.score / 10);
           const isNewHigh = sc >= highScore && highScore > 0;
-          ctx.fillStyle = 'rgba(0,0,0,0.65)';
-          ctx.fillRect(W / 2 - 150, H / 2 - 65, 300, isNewHigh ? 130 : 110);
-          ctx.strokeStyle = state === 'eaten' ? '#ff4444' : '#aaccff';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(W / 2 - 150, H / 2 - 65, 300, isNewHigh ? 130 : 110);
-          ctx.textAlign = 'center';
+          const dh = isNewHigh ? 140 : 120;
+          const bx = W / 2 - 160, by = H / 2 - dh / 2, bw = 320, bh = dh;
+          // Win95 dialog box
+          ctx.fillStyle = '#c0c0c0';
+          ctx.fillRect(bx, by, bw, bh);
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(bx, by + bh); ctx.lineTo(bx, by); ctx.lineTo(bx + bw, by); ctx.stroke();
+          ctx.strokeStyle = '#808080';
+          ctx.beginPath(); ctx.moveTo(bx + bw, by); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx, by + bh); ctx.stroke();
+          // Title bar
+          ctx.fillStyle = '#000080';
+          ctx.fillRect(bx + 2, by + 2, bw - 4, 18);
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 22px monospace';
-          ctx.fillText(state === 'eaten' ? '😱 EATEN BY YETI!' : 'CRASHED!', W / 2, H / 2 - 25);
-          ctx.font = 'bold 18px monospace';
-          ctx.fillStyle = '#ffdd88';
-          ctx.fillText(`${sc}m`, W / 2, H / 2 + 5);
-          if (isNewHigh) {
-            ctx.fillStyle = '#44ffaa';
-            ctx.font = '13px monospace';
-            ctx.fillText('NEW HIGH SCORE!', W / 2, H / 2 + 28);
+          ctx.font = 'bold 11px "Arial", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(state === 'eaten' ? 'SkiFree' : 'SkiFree', bx + bw / 2, by + 15);
+          // Message
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 13px "Arial", sans-serif';
+          ctx.fillText(state === 'eaten' ? 'You have been eaten by the Abominable' : 'You crashed!', bx + bw / 2, by + 46);
+          if (state === 'eaten') {
+            ctx.fillText('Snow Monster!', bx + bw / 2, by + 62);
           }
-          ctx.fillStyle = '#aaddff';
-          ctx.font = '11px monospace';
-          ctx.fillText('Click or SPACE to play again', W / 2, H / 2 + (isNewHigh ? 52 : 36));
+          ctx.font = '12px "Arial", sans-serif';
+          ctx.fillStyle = '#000080';
+          ctx.fillText(`Distance skied: ${sc} m`, bx + bw / 2, by + (state === 'eaten' ? 82 : 68));
+          if (isNewHigh) {
+            ctx.fillStyle = '#008000';
+            ctx.font = 'bold 12px "Arial", sans-serif';
+            ctx.fillText('New personal best!', bx + bw / 2, by + (state === 'eaten' ? 100 : 86));
+          }
+          // Win95-style OK button
+          const btnY = by + bh - 28;
+          ctx.fillStyle = '#c0c0c0';
+          ctx.fillRect(bx + bw / 2 - 36, btnY, 72, 20);
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
+          ctx.strokeRect(bx + bw / 2 - 36, btnY, 72, 20);
+          ctx.strokeStyle = '#808080';
+          ctx.beginPath();
+          ctx.moveTo(bx + bw / 2 + 36, btnY); ctx.lineTo(bx + bw / 2 + 36, btnY + 20);
+          ctx.lineTo(bx + bw / 2 - 36, btnY + 20); ctx.stroke();
+          ctx.fillStyle = '#000000';
+          ctx.font = '11px "Arial", sans-serif';
+          ctx.fillText('OK', bx + bw / 2, btnY + 14);
           ctx.textAlign = 'left';
         }
       }

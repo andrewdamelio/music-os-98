@@ -76,7 +76,7 @@ export default function PianoRoll() {
   const totalW = BEATS * beatW;
   const totalH = NUM_NOTES * NOTE_HEIGHT;
 
-  const playheadX = isPlaying ? ((audioEngine.pianoRollBeat / (BEATS * 4)) * totalW) : -1;
+  const playheadX = isPlaying ? ((audioEngine.pianoRollDisplayBeat / (BEATS * 4)) * totalW) : -1;
 
   const handleGridClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!gridRef.current) return;

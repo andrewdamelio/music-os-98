@@ -233,6 +233,20 @@ function ChannelStrip({ index }: { index: number }) {
         </div>
       </div>
 
+      {/* FX Send — channels 0–3 only */}
+      {index < 4 && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 5 }}>
+          <div style={{ fontSize: 7, color: (ch.fxSend ?? 0) > 0 ? '#ff8844' : 'rgba(255,255,255,0.2)',
+            fontFamily: 'monospace', letterSpacing: 0.5 }}>FX</div>
+          <SendKnob value={ch.fxSend ?? 0}
+            onChange={v => updateMixerChannel(index, { fxSend: parseFloat(v.toFixed(3)) })} />
+          <div style={{ fontSize: 7, fontFamily: 'monospace',
+            color: (ch.fxSend ?? 0) > 0 ? '#ff8844' : 'rgba(255,255,255,0.15)' }}>
+            {Math.round((ch.fxSend ?? 0) * 100)}
+          </div>
+        </div>
+      )}
+
       {/* M / S buttons */}
       <div style={{ display: 'flex', gap: 3, padding: '6px 0 2px' }}>
         <button onClick={() => updateMixerChannel(index, { muted: !ch.muted })} style={{
@@ -255,19 +269,6 @@ function ChannelStrip({ index }: { index: number }) {
         }}>S</button>
       </div>
 
-      {/* FX Send — channels 0–5 only */}
-      {index < 6 && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 5 }}>
-          <div style={{ fontSize: 7, color: (ch.fxSend ?? 0) > 0 ? '#ff8844' : 'rgba(255,255,255,0.2)',
-            fontFamily: 'monospace', letterSpacing: 0.5 }}>FX</div>
-          <SendKnob value={ch.fxSend ?? 0}
-            onChange={v => updateMixerChannel(index, { fxSend: parseFloat(v.toFixed(3)) })} />
-          <div style={{ fontSize: 7, fontFamily: 'monospace',
-            color: (ch.fxSend ?? 0) > 0 ? '#ff8844' : 'rgba(255,255,255,0.15)' }}>
-            {Math.round((ch.fxSend ?? 0) * 100)}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -349,8 +350,8 @@ export default function Mixer() {
       {/* Strips */}
       <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
         <div style={{ display: 'flex', gap: 3, padding: '0 10px', height: '100%', alignItems: 'flex-start' }}>
-          {/* Input channels 0–5 */}
-          {[0,1,2,3,4,5].map(i => <ChannelStrip key={i} index={i} />)}
+          {/* Input channels 0–3 (Drums, Synth, Pads, Keys) */}
+          {[0,1,2,3].map(i => <ChannelStrip key={i} index={i} />)}
           {/* Divider */}
           <div style={{ width: 2, alignSelf: 'stretch', margin: '0 5px',
             background: 'linear-gradient(to bottom, transparent, #383050, transparent)', flexShrink: 0 }} />
@@ -364,7 +365,7 @@ export default function Mixer() {
         borderTop: '1px solid #0e0f1a', background: '#0a0b14', flexShrink: 0 }}>
         <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#ff8844',
           boxShadow: '0 0 5px #ff884488' }} />
-        <span style={{ fontSize: 8, color: '#ff8844', letterSpacing: 0.5 }}>FX SND knob routes channel to FX Rack chain</span>
+        <span style={{ fontSize: 8, color: '#ff8844', letterSpacing: 0.5 }}>FX SND routes to FX Rack chain</span>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 8, color: '#2a2c40' }}>Double-click pan knob to center</span>
       </div>
