@@ -81,15 +81,17 @@ export const APPS: AppDef[] = [
   { id: 'file-browser', title: 'Sample Library', icon: '📁', component: 'FileBrowser', defaultSize: { w: 540, h: 460 }, singleton: true },
   { id: 'tempo-calc', title: 'Tempo Calc', icon: '🔢', component: 'TempoCalc', defaultSize: { w: 340, h: 400 }, singleton: true },
   { id: 'help', title: 'Help & Manual', icon: '❓', component: 'Help', defaultSize: { w: 620, h: 520 }, singleton: true },
-  { id: 'oscilloscope', title: 'Oscilloscope', icon: '📊', component: 'Oscilloscope', defaultSize: { w: 560, h: 280 }, singleton: true },
-  { id: 'milkdrop', title: 'MilkDrop Viz', icon: '🌊', component: 'MilkDrop', defaultSize: { w: 640, h: 520 }, singleton: true },
+  { id: 'oscilloscope', title: 'Oscilloscope', icon: '📊', component: 'Oscilloscope', defaultSize: { w: 580, h: 240 }, singleton: true },
+  { id: 'milkdrop', title: 'MilkDrop Viz', icon: '🌊', component: 'MilkDrop', defaultSize: { w: 520, h: 420 }, singleton: true },
   { id: 'compressor', title: 'Compressor', icon: '🔊', component: 'Compressor', defaultSize: { w: 560, h: 320 }, singleton: true },
   { id: 'eq', title: 'Parametric EQ', icon: '🎛️', component: 'EQ', defaultSize: { w: 580, h: 420 }, singleton: true },
-  { id: 'pad-machine', title: 'Pad Machine', icon: '🎮', component: 'PadMachine', defaultSize: { w: 720, h: 540 }, singleton: true },
+  { id: 'pad-machine', title: 'Pad Machine', icon: '🎶', component: 'PadMachine', defaultSize: { w: 720, h: 540 }, singleton: true },
   { id: 'ski-free', title: 'SkiFree', icon: '⛷️', component: 'SkiFree', defaultSize: { w: 600, h: 480 }, singleton: true },
   { id: 'screen-mate', title: 'Screen Mate Poo', icon: '🐑', component: 'ScreenMate', defaultSize: { w: 400, h: 300 }, singleton: false },
   { id: 'sub-seven', title: 'SubSeven 2.2 [G]old', icon: '💀', component: 'SubSeven', defaultSize: { w: 680, h: 520 }, singleton: true },
   { id: 'control-panel', title: 'Audio Control Panel', icon: '🔊', component: 'ControlPanel', defaultSize: { w: 320, h: 320 }, singleton: true },
+  { id: 'icq', title: 'ICQ', icon: '🌸', component: 'ICQ', defaultSize: { w: 230, h: 440 }, singleton: true },
+  { id: 'napster', title: 'Napster', icon: '🐱', component: 'Napster', defaultSize: { w: 760, h: 540 }, singleton: true },
 ];
 
 let zCounter = 100;
@@ -189,6 +191,10 @@ interface OSStore {
   eqParams: EQParams;
   setEQEnabled: (enabled: boolean) => void;
   setEQBand: (idx: number, gain: number) => void;
+
+  // ICQ
+  icqStatus: 'online' | 'away' | 'dnd' | 'na' | 'offline';
+  setIcqStatus: (s: 'online' | 'away' | 'dnd' | 'na' | 'offline') => void;
 }
 
 const defaultMixerChannels: MixerChannelState[] = [
@@ -727,4 +733,8 @@ export const useOSStore = create<OSStore>((set, get) => ({
       return { eqParams: { ...s.eqParams, gains } };
     });
   },
+
+  // ICQ
+  icqStatus: 'online',
+  setIcqStatus: (s) => set({ icqStatus: s }),
 }));

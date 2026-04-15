@@ -50,6 +50,8 @@ import scmpoo103 from '../assets/scmpoo103.png';
 import DesktopPet from './DesktopPet';
 import SubSeven from '../apps/SubSeven';
 import ControlPanel from '../apps/ControlPanel';
+import ICQ from '../apps/ICQ';
+import Napster, { NapsterCatIcon } from '../apps/Napster';
 
 function SubSevenIcon({ size = 32 }: { size?: number }) {
   return (
@@ -112,6 +114,8 @@ const APP_MAP: Record<string, React.ComponentType> = {
   MilkDrop,
   SubSeven,
   ControlPanel,
+  ICQ,
+  Napster,
 };
 
 const DESKTOP_ICONS = [
@@ -127,11 +131,12 @@ const DESKTOP_ICONS = [
   { id: 'compressor', label: 'Compressor', icon: '🔊' },
   { id: 'eq', label: 'Parametric EQ', icon: '🎛️' },
   { id: 'tempo-calc', label: 'Tempo Calc', icon: '🔢' },
-  { id: 'pad-machine', label: 'Pad Machine', icon: '🎮' },
+  { id: 'pad-machine', label: 'Pad Machine', icon: '🎶' },
   { id: 'ski-free', label: 'SkiFree', icon: '⛷️' },
   { id: 'screen-mate', label: 'Screen Mate Poo', icon: '🐑', iconImg: { src: scmpoo103, frame: 0 } },
   { id: 'milkdrop', label: 'MilkDrop Viz', icon: '🌊' },
   { id: 'sub-seven', label: 'SubSeven', icon: '💀', iconSvg: true },
+  { id: 'napster', label: 'Napster', icon: '🐱', iconSvg: true },
 ];
 
 export default function Desktop() {
@@ -142,7 +147,7 @@ export default function Desktop() {
     const saved = localStorage.getItem('musicOS98_wallpaper');
     return saved ? parseInt(saved, 10) % WALLPAPERS.length : 0;
   });
-  const [petVisible, setPetVisible] = useState(false);
+  const [petVisible, setPetVisible] = useState(() => localStorage.getItem('musicOS98_pet') === '1');
   const loadFileRef = useRef<HTMLInputElement>(null);
 
   // SubSeven fun effect: rotate wallpaper
@@ -236,7 +241,7 @@ export default function Desktop() {
               key={icon.id}
               className="desktop-icon"
               onDoubleClick={() => {
-                if (icon.id === 'screen-mate') { setPetVisible(v => !v); return; }
+                if (icon.id === 'screen-mate') { setPetVisible(v => { const next = !v; localStorage.setItem('musicOS98_pet', next ? '1' : '0'); return next; }); return; }
                 openApp(icon.id);
               }}
               onContextMenu={e => {
@@ -256,7 +261,7 @@ export default function Desktop() {
                   imageRendering: 'pixelated',
                 }} />
               ) : (icon as { iconSvg?: boolean }).iconSvg ? (
-                <SubSevenIcon size={32} />
+                icon.id === 'napster' ? <NapsterCatIcon size={32} /> : <SubSevenIcon size={32} />
               ) : (
                 <div className="desktop-icon-emoji">{icon.icon}</div>
               )}

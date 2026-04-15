@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useOSStore } from '../store';
 import StartMenu from './StartMenu';
+import { ICQ_STATUS_CONFIG } from '../apps/ICQ';
 
 export default function Taskbar() {
-  const { windows, focusedWindowId, openApp, minimizeWindow, restoreWindow, focusWindow, startMenuOpen, setStartMenuOpen } = useOSStore();
+  const { windows, focusedWindowId, openApp, minimizeWindow, restoreWindow, focusWindow, startMenuOpen, setStartMenuOpen, icqStatus } = useOSStore();
   const [clock, setClock] = useState('');
 
   useEffect(() => {
@@ -91,35 +92,28 @@ export default function Taskbar() {
         {/* System tray */}
         <div className="taskbar-tray">
 
-          {/* ICQ — flower logo: 8 petals (7 green + 1 red), yellow center, black outline */}
-          <div title="ICQ — You've got a message! (UIN: 1337420)" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1px 2px' }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" style={{ display: 'block' }}>
-              <g transform="translate(8,8)">
-                {/* Black outline layer — slightly larger petals drawn first */}
-                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" />
-                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(45)" />
-                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(90)" />
-                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(135)" />
-                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(180)" />
-                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(225)" />
-                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(270)" />
-                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(315)" />
-                {/* Colored petals — 7 green, 1 red (lower-left at 225°) */}
-                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" />
-                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(45)" />
-                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(90)" />
-                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(135)" />
-                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(180)" />
-                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#ee0000" transform="rotate(225)" />
-                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(270)" />
-                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(315)" />
-                {/* Black center ring */}
-                <circle cx="0" cy="0" r="2.0" fill="black" />
-                {/* Yellow center dot */}
-                <circle cx="0" cy="0" r="1.4" fill="#ffcc00" />
-              </g>
-            </svg>
-          </div>
+          {/* ICQ — flower logo, color reflects status */}
+          {(() => {
+            const petalColor = ICQ_STATUS_CONFIG[icqStatus].petal;
+            const tip = `ICQ — ${ICQ_STATUS_CONFIG[icqStatus].label} (UIN: 1337420)\nDouble-click to open`;
+            return (
+              <div title={tip} onClick={() => openApp('icq')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1px 4px' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" style={{ display: 'block' }}>
+                  <g transform="translate(8,8)">
+                    {[0,45,90,135,180,225,270,315].map(r => (
+                      <ellipse key={r} cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform={`rotate(${r})`} />
+                    ))}
+                    {[0,45,90,135,180,270,315].map(r => (
+                      <ellipse key={r} cx="0" cy="-4.0" rx="1.5" ry="2.5" fill={petalColor} transform={`rotate(${r})`} />
+                    ))}
+                    <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#ee0000" transform="rotate(225)" />
+                    <circle cx="0" cy="0" r="2.0" fill="black" />
+                    <circle cx="0" cy="0" r="1.4" fill="#ffcc00" />
+                  </g>
+                </svg>
+              </div>
+            );
+          })()}
 
           <span title="Audio active" style={{ fontSize: 12 }}>🔊</span>
           <span style={{ fontSize: 10 }}>{clock}</span>

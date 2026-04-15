@@ -19,6 +19,8 @@ const RENDER_H = Math.round(TILE_H * SCALE);
 // Scmpoo sprite sheets: 640×40, 16 frames × 40px each
 const S_FW = 40;
 const S_FH = 40;
+// Scale poo companion to match the sheep's rendered width exactly
+const POO_SCALE = RENDER_W / S_FW; // 32/40 = 0.8
 function scmpooStyle(sheet: string, frameIdx: number, x: number, y: number, scale = 2): React.CSSProperties {
   return {
     position: 'fixed',
@@ -417,8 +419,9 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
         pooRef.current = { sheet: scmpoo108, frames: [7, 8, 9, 10, 9, 8, 7], frameDuration: 200, startTs };
       }
       // Show poo sprite aligned with sheep position (centred, bottom-aligned)
-      const px = pos.x - Math.round((S_FW - RENDER_W) / 2);
-      const py = pos.y - (S_FH - RENDER_H);
+      const pooRenderedH = Math.round(S_FH * POO_SCALE);
+      const px = pos.x;
+      const py = pos.y + (RENDER_H - pooRenderedH);
       setPooDisplay({ sheet: pooRef.current!.sheet, frame: pooRef.current!.frames[0], x: px, y: py });
     } else if (POO_STATES.includes(stateRef.current)) {
       // Transitioning OUT of a poo state — clear it
@@ -530,8 +533,9 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       frames = [7, 8, 9, 10, 9, 8, 7]; sheet = scmpoo108; frameDuration = 200;
     }
     pooRef.current = { sheet, frames, frameDuration, startTs };
-    const px = pos.x - Math.round((S_FW - RENDER_W) / 2);
-    const py = pos.y - (S_FH - RENDER_H);
+    const pooRenderedH = Math.round(S_FH * POO_SCALE);
+    const px = pos.x;
+    const py = pos.y + (RENDER_H - pooRenderedH);
     setPooDisplay({ sheet, frame: frames[0], x: px, y: py });
     stateRef.current = state;
     velRef.current.x = 0;
@@ -695,8 +699,9 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       } else {
         const frameIdx = Math.floor(elapsed / poo.frameDuration);
         const frame = poo.frames[frameIdx];
-        const px = pos.x - Math.round((S_FW - RENDER_W) / 2);
-        const py = pos.y - (S_FH - RENDER_H);
+        const pooRenderedH = Math.round(S_FH * POO_SCALE);
+        const px = pos.x;
+        const py = pos.y + (RENDER_H - pooRenderedH);
         setPooDisplay({ sheet: poo.sheet, frame, x: px, y: py });
       }
     }
@@ -1104,7 +1109,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       {/* Scmpoo companion — overlays sheep during poo_* animations */}
       {pooDisplay && (
         <div style={{
-          ...scmpooStyle(pooDisplay.sheet, pooDisplay.frame, pooDisplay.x, pooDisplay.y, 1),
+          ...scmpooStyle(pooDisplay.sheet, pooDisplay.frame, pooDisplay.x, pooDisplay.y, POO_SCALE),
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
         }} />
       )}
