@@ -1,5 +1,43 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+// ── IndexedDB persistence ─────────────────────────────────────────────────────
+const IDB_NAME = 'napsterLibrary';
+const IDB_STORE = 'files';
+
+interface IDBRecord {
+  id: string; name: string; size: number; duration: number; buffer: ArrayBuffer;
+}
+
+function idbOpen(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE, { keyPath: 'id' });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbGetAll(db: IDBDatabase): Promise<IDBRecord[]> {
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).getAll();
+    req.onsuccess = () => resolve(req.result as IDBRecord[]);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbPut(db: IDBDatabase, record: IDBRecord): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(record);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function idbPatchDuration(db: IDBDatabase, id: string, duration: number): void {
+  const tx = db.transaction(IDB_STORE, 'readwrite');
+  const store = tx.objectStore(IDB_STORE);
+  const req = store.get(id);
+  req.onsuccess = () => { if (req.result) { req.result.duration = duration; store.put(req.result); } };
+}
+
 // ── Napster Cat Icon ──────────────────────────────────────────────────────────
 export function NapsterCatIcon({ size = 32 }: { size?: number }) {
   return (
@@ -201,6 +239,9 @@ export default function Napster() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dlTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timePollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dbRef = useRef<IDBDatabase | null>(null);
+  // Track blob URLs we own so we can revoke on unmount
+  const blobUrlsRef = useRef<string[]>([]);
 
   const getCtx = useCallback(() => {
     if (!napCtxRef.current) napCtxRef.current = new AudioContext();
@@ -221,6 +262,29 @@ export default function Napster() {
     setDownloads(prev => [dl, ...prev].slice(0, 20));
     return dl.id;
   }, []);
+
+  // ── Load persisted library from IndexedDB on mount ───────────────────────
+  useEffect(() => {
+    idbOpen().then(async db => {
+      dbRef.current = db;
+      const records = await idbGetAll(db);
+      if (records.length === 0) return;
+      const loaded: NapFile[] = records.map(r => {
+        // Recreate blob URL from stored bytes — no MIME type needed (Web Audio decodes it)
+        const blob = new Blob([r.buffer]);
+        const url = URL.createObjectURL(blob);
+        blobUrlsRef.current.push(url);
+        return { id: r.id, name: r.name, url, size: r.size, duration: r.duration };
+      });
+      setFiles(loaded);
+    }).catch(err => console.warn('[Napster] IndexedDB load failed:', err));
+
+    return () => {
+      // Revoke all blob URLs we created to free memory
+      blobUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+      blobUrlsRef.current = [];
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Progress ticker
   useEffect(() => {
@@ -273,16 +337,20 @@ export default function Napster() {
     if (!fileList) return;
     Array.from(fileList).forEach(f => {
       const url = URL.createObjectURL(f);
-      const newFile: NapFile = {
-        id: `${Date.now()}_${Math.random()}`,
-        name: f.name.replace(/\.webm$/i, ''),
-        url,
-        size: f.size,
-        duration: 0,
-      };
-      // Duration will be populated via decodeAudioData when first played
+      blobUrlsRef.current.push(url);
+      const id = `${Date.now()}_${Math.random()}`;
+      const newFile: NapFile = { id, name: f.name.replace(/\.webm$/i, ''), url, size: f.size, duration: 0 };
       setFiles(prev => [...prev, newFile]);
       spawnFakeDownload(newFile);
+
+      // Persist bytes to IndexedDB so the library survives page refresh
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (!dbRef.current || !(reader.result instanceof ArrayBuffer)) return;
+        idbPut(dbRef.current, { id, name: newFile.name, size: f.size, duration: 0, buffer: reader.result })
+          .catch(err => console.warn('[Napster] IDB save failed:', err));
+      };
+      reader.readAsArrayBuffer(f);
     });
     e.target.value = '';
   }, [spawnFakeDownload]);
@@ -325,9 +393,10 @@ export default function Napster() {
       const ab = await resp.arrayBuffer();
       const buffer = await ctx.decodeAudioData(ab);
 
-      // Update duration now that we've decoded
+      // Update duration now that we've decoded, and persist it to IndexedDB
       const dur = Math.round(buffer.duration);
       setFiles(prev => prev.map(p => p.id === file.id ? { ...p, duration: dur } : p));
+      if (dbRef.current) idbPatchDuration(dbRef.current, file.id, dur);
 
       const source = ctx.createBufferSource();
       source.buffer = buffer;

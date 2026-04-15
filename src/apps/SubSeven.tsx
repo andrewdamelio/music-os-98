@@ -85,16 +85,27 @@ const CHAT_HISTORY = [
 ];
 
 const FUN_ACTIONS = [
-  { label: 'Flip Screen',           cmd: 'flip'      },
-  { label: 'Swap Mouse Buttons',    cmd: 'swapMouse' },
-  { label: 'Show Blue Screen',      cmd: 'bsod'      },
-  { label: 'Play Wav File',         cmd: 'playwav'   },
-  { label: 'Hide Desktop Icons',    cmd: 'hideicons' },
-  { label: 'Rotate Wallpaper',      cmd: 'wallpaper' },
-  { label: 'Move Mouse to 0,0',     cmd: 'mousemove' },
-  { label: 'Set Resolution 640×480',cmd: 'screenres' },
-  { label: 'Fake Shutdown',         cmd: 'shutdown'  },
-  { label: 'Send Message Box',      cmd: 'msgbox'    },
+  { label: 'Flip Screen',           cmd: 'flip'       },
+  { label: 'Swap Mouse Buttons',    cmd: 'swapMouse'  },
+  { label: 'Show Blue Screen',      cmd: 'bsod'       },
+  { label: 'Play Wav File',         cmd: 'playwav'    },
+  { label: 'Hide Desktop Icons',    cmd: 'hideicons'  },
+  { label: 'Rotate Wallpaper',      cmd: 'wallpaper'  },
+  { label: 'Move Mouse to 0,0',     cmd: 'mousemove'  },
+  { label: 'Set Resolution 640×480',cmd: 'screenres'  },
+  { label: 'Fake Shutdown',         cmd: 'shutdown'   },
+  { label: 'Send Message Box',      cmd: 'msgbox'     },
+  // ── Web-native extras ───────────────────────────────
+  { label: 'Earthquake',            cmd: 'earthquake' },
+  { label: 'Invert Colors',         cmd: 'invert'     },
+  { label: 'Disco Mode',            cmd: 'disco'      },
+  { label: 'Matrix Rain',           cmd: 'matrix'     },
+  { label: 'Cursor Trail',          cmd: 'cursorTrail'},
+  { label: 'Drunk Mode',            cmd: 'drunk'      },
+  { label: 'Pop-up Storm',          cmd: 'popupStorm' },
+  { label: 'VHS Glitch',            cmd: 'vhs'        },
+  { label: 'Nyan Cat',              cmd: 'nyan'       },
+  { label: 'Confetti Blast',        cmd: 'confetti'   },
 ];
 
 // ── Fun Effect Engine ─────────────────────────────────────────────────────────
@@ -273,6 +284,184 @@ const funEffects = {
     document.body.appendChild(el);
     const tid = setTimeout(() => { msg.textContent = 'It is now safe to turn off your computer.'; }, 2200);
     return () => { clearTimeout(tid); el.remove(); };
+  },
+
+  // ── Web-native extras ──────────────────────────────────────────────────────
+
+  earthquake(): () => void {
+    const sty = document.createElement('style');
+    sty.textContent = '@keyframes s7q{0%,100%{transform:translate(0,0) rotate(0deg)}20%{transform:translate(-5px,4px) rotate(-0.4deg)}40%{transform:translate(5px,-4px) rotate(0.4deg)}60%{transform:translate(-4px,5px) rotate(-0.3deg)}80%{transform:translate(4px,-5px) rotate(0.3deg)}}';
+    document.head.appendChild(sty);
+    document.body.style.animation = 's7q 0.1s linear infinite';
+    return () => { document.body.style.animation = ''; sty.remove(); };
+  },
+
+  invert(): () => void {
+    const prev = document.body.style.filter;
+    document.body.style.filter = 'invert(1) hue-rotate(180deg)';
+    return () => { document.body.style.filter = prev; };
+  },
+
+  disco(): () => void {
+    const sty = document.createElement('style');
+    sty.textContent = '@keyframes s7disco{from{filter:hue-rotate(0deg) saturate(3) brightness(1.1)}to{filter:hue-rotate(360deg) saturate(3) brightness(1.1)}}';
+    document.head.appendChild(sty);
+    const prev = document.body.style.animation;
+    document.body.style.animation = 's7disco 0.4s linear infinite';
+    return () => { document.body.style.animation = prev; sty.remove(); };
+  },
+
+  matrix(): () => void {
+    const canvas = document.createElement('canvas');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    canvas.style.cssText = 'position:fixed;inset:0;z-index:999998;pointer-events:none;';
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext('2d')!;
+    const cols = Math.floor(canvas.width / 14);
+    const drops = Array.from({ length: cols }, () => Math.random() * -60);
+    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホ0123456789ABCDEF!@#$%^&*';
+    let raf: number;
+    const draw = () => {
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = '13px monospace';
+      drops.forEach((y, i) => {
+        // Lead char is bright white, trail is green
+        ctx.fillStyle = '#aaffaa';
+        ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * 14, y * 14);
+        if (y > 2) { ctx.fillStyle = '#00cc33'; ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * 14, (y - 1) * 14); }
+        if (y * 14 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i] += 0.5;
+      });
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { cancelAnimationFrame(raf); canvas.remove(); };
+  },
+
+  cursorTrail(): () => void {
+    const colors = ['#ff0044','#ff8800','#ffee00','#00ff88','#00cfff','#cc44ff','#ff44cc'];
+    const dots: HTMLDivElement[] = [];
+    const onMove = (e: MouseEvent) => {
+      const dot = document.createElement('div');
+      const size = 6 + Math.floor(Math.random() * 6);
+      dot.style.cssText = `position:fixed;left:${e.clientX - size/2}px;top:${e.clientY - size/2}px;width:${size}px;height:${size}px;border-radius:50%;background:${colors[Math.floor(Math.random() * colors.length)]};pointer-events:none;z-index:999997;transition:opacity 0.5s,transform 0.5s;`;
+      document.body.appendChild(dot);
+      dots.push(dot);
+      requestAnimationFrame(() => requestAnimationFrame(() => { dot.style.opacity = '0'; dot.style.transform = 'scale(0.1)'; }));
+      setTimeout(() => { dot.remove(); const idx = dots.indexOf(dot); if (idx >= 0) dots.splice(idx, 1); }, 520);
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => { window.removeEventListener('mousemove', onMove); dots.forEach(d => d.remove()); };
+  },
+
+  drunk(): () => void {
+    const sty = document.createElement('style');
+    sty.textContent = '@keyframes s7drunk{0%{transform:rotate(-2.5deg) translate(-3px,1px)}25%{transform:rotate(1.5deg) translate(3px,-2px)}50%{transform:rotate(-1deg) translate(-2px,3px)}75%{transform:rotate(2.5deg) translate(2px,-1px)}100%{transform:rotate(-2.5deg) translate(-3px,1px)}}';
+    document.head.appendChild(sty);
+    document.body.style.animation = 's7drunk 1.1s ease-in-out infinite';
+    document.body.style.transformOrigin = 'center center';
+    return () => { document.body.style.animation = ''; document.body.style.transformOrigin = ''; sty.remove(); };
+  },
+
+  popupStorm(): () => void {
+    const msgs = [
+      ['FATAL ERROR: KERNEL32.DLL corrupted at 0x00401000', '💀'],
+      ['VIRUS DETECTED: Win32.SubSeven.Trojan', '☠️'],
+      ['Stack overflow in module: MSVBVM60.DLL', '💣'],
+      ['Not enough memory to complete operation', '😵'],
+      ['Illegal operation performed by EXPLORER.EXE', '🚨'],
+      ['Registry corruption detected. Run SCANREG.', '⚠️'],
+      ['Your free trial of Windows has expired.', '🪟'],
+    ];
+    const popups: HTMLElement[] = [];
+    let count = 0;
+    const spawnOne = () => {
+      if (count >= msgs.length) return;
+      const [text, icon] = msgs[count];
+      const wrap = document.createElement('div');
+      wrap.style.cssText = `position:fixed;left:${80 + count*55}px;top:${60 + count*38}px;z-index:${999990+count};font-family:Tahoma,sans-serif;`;
+      const dlg = document.createElement('div');
+      dlg.style.cssText = 'background:#d4d0c8;border:2px solid;border-color:#fff #808080 #808080 #fff;min-width:280px;box-shadow:4px 4px 0 #000;';
+      const tb = document.createElement('div');
+      tb.style.cssText = 'background:linear-gradient(to right,#000080,#1084d0);color:#fff;padding:3px 8px;font-size:11px;font-weight:bold;display:flex;justify-content:space-between;align-items:center;';
+      tb.innerHTML = `<span>Error</span>`;
+      const xb = document.createElement('button');
+      xb.textContent = '✕'; xb.style.cssText = 'background:#c0c0c0;border:1px solid;border-color:#fff #808080 #808080 #fff;width:16px;height:14px;font-size:9px;cursor:pointer;padding:0;';
+      xb.onclick = () => wrap.remove();
+      tb.appendChild(xb);
+      const body = document.createElement('div');
+      body.style.cssText = 'padding:14px 16px;display:flex;gap:12px;align-items:flex-start;font-size:12px;';
+      body.innerHTML = `<span style="font-size:22px;flex-shrink:0;">${icon}</span><span>${text}</span>`;
+      const foot = document.createElement('div');
+      foot.style.cssText = 'padding:8px;display:flex;justify-content:center;border-top:1px solid #808080;gap:6px;';
+      ['OK','Ignore','Retry'].slice(0, (count % 3) + 1).forEach(lbl => {
+        const b = document.createElement('button');
+        b.textContent = lbl; b.style.cssText = 'background:#d4d0c8;border:2px solid;border-color:#fff #808080 #808080 #fff;padding:3px 16px;font-family:Tahoma;font-size:11px;cursor:pointer;min-width:60px;';
+        b.onclick = () => wrap.remove();
+        foot.appendChild(b);
+      });
+      dlg.appendChild(tb); dlg.appendChild(body); dlg.appendChild(foot);
+      wrap.appendChild(dlg);
+      document.body.appendChild(wrap);
+      popups.push(wrap);
+      count++;
+      if (count < msgs.length) setTimeout(spawnOne, 250 + Math.random() * 150);
+    };
+    spawnOne();
+    return () => { popups.forEach(p => p.remove()); };
+  },
+
+  vhs(): () => void {
+    const overlay = mkOverlay('transparent', 'pointer-events:none;');
+    overlay.style.backgroundImage = 'repeating-linear-gradient(0deg,rgba(0,0,0,0.07) 0px,rgba(0,0,0,0.07) 1px,transparent 1px,transparent 3px)';
+    document.body.appendChild(overlay);
+    const sty = document.createElement('style');
+    sty.textContent = '@keyframes s7vhs{0%,100%{transform:translate(0,0);filter:none}5%{transform:translate(-4px,0);filter:hue-rotate(90deg) saturate(2)}10%{transform:translate(3px,0);filter:hue-rotate(-90deg) saturate(2)}12%{transform:translate(0,0);filter:none}30%{transform:translate(-2px,1px);filter:brightness(1.3) saturate(0)}32%{transform:translate(0,0);filter:none}60%{transform:translate(4px,0);filter:hue-rotate(180deg)}62%{transform:translate(-4px,0);filter:hue-rotate(-180deg)}64%{transform:translate(0,0);filter:none}}';
+    document.head.appendChild(sty);
+    document.body.style.animation = 's7vhs 2.8s steps(1) infinite';
+    return () => { document.body.style.animation = ''; overlay.remove(); sty.remove(); };
+  },
+
+  nyan(): () => void {
+    const sty = document.createElement('style');
+    sty.textContent = '@keyframes s7nyan{from{left:-140px}to{left:calc(100vw + 30px)}}';
+    document.head.appendChild(sty);
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;top:28%;z-index:999998;pointer-events:none;font-size:48px;white-space:nowrap;animation:s7nyan 2.2s linear forwards;filter:drop-shadow(0 0 8px #ff88ff);';
+    el.textContent = '🌈🐱✨';
+    document.body.appendChild(el);
+    const tid = setTimeout(() => { el.remove(); sty.remove(); }, 2400);
+    return () => { clearTimeout(tid); el.remove(); sty.remove(); };
+  },
+
+  confetti(): () => void {
+    const colors = ['#ff0044','#ff8800','#ffee00','#00ff88','#00cfff','#cc44ff','#ff44cc','#ffffff'];
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight * 0.35;
+    const particles: HTMLDivElement[] = [];
+    for (let i = 0; i < 90; i++) {
+      const p = document.createElement('div');
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 5 + Math.random() * 10;
+      let vx = Math.cos(angle) * spd, vy = Math.sin(angle) * spd - 6;
+      const size = 4 + Math.floor(Math.random() * 7);
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const isRect = Math.random() > 0.5;
+      p.style.cssText = `position:fixed;width:${size}px;height:${isRect ? size*0.5 : size}px;background:${color};pointer-events:none;z-index:999997;border-radius:${isRect ? 0 : '50%'};left:${cx}px;top:${cy}px;`;
+      document.body.appendChild(p);
+      particles.push(p);
+      let x = cx, y = cy;
+      const tick = () => {
+        x += vx; y += vy; vy += 0.35; vx *= 0.99;
+        p.style.left = x + 'px'; p.style.top = y + 'px';
+        p.style.transform = `rotate(${x * 2}deg)`;
+        if (y < window.innerHeight + 30) requestAnimationFrame(tick);
+        else p.remove();
+      };
+      setTimeout(() => requestAnimationFrame(tick), i * 8);
+    }
+    return () => particles.forEach(p => { try { p.remove(); } catch {} });
   },
 };
 
@@ -679,6 +868,38 @@ function PanelFunManager({ onStatus }: { onStatus: (s: string) => void }) {
         break;
       case 'msgbox':
         applyFunEffect(() => { onStatus(`[msgbox] "${msgVal}" → ${VICTIM.hostname}`); return funEffects.msgbox(msgVal); });
+        break;
+      case 'earthquake':
+        applyFunEffect(() => { onStatus('[earthquake] Shaking screen — press any key to stop'); return funEffects.earthquake(); });
+        break;
+      case 'invert':
+        applyFunEffect(() => { onStatus('[invert] Colors inverted — press any key to restore'); return funEffects.invert(); });
+        break;
+      case 'disco':
+        applyFunEffect(() => { onStatus('[disco] Disco mode activated — press any key to stop'); return funEffects.disco(); });
+        break;
+      case 'matrix':
+        applyFunEffect(() => { onStatus('[matrix] Matrix rain initiated — press any key to stop'); return funEffects.matrix(); });
+        break;
+      case 'cursorTrail':
+        applyFunEffect(() => { onStatus('[cursorTrail] Cursor trail active — press any key to stop'); return funEffects.cursorTrail(); });
+        break;
+      case 'drunk':
+        applyFunEffect(() => { onStatus('[drunk] Drunk mode on — press any key to sober up'); return funEffects.drunk(); });
+        break;
+      case 'popupStorm':
+        applyFunEffect(() => { onStatus('[popupStorm] Pop-up storm unleashed — press any key to clear'); return funEffects.popupStorm(); });
+        break;
+      case 'vhs':
+        applyFunEffect(() => { onStatus('[vhs] VHS glitch active — press any key to restore'); return funEffects.vhs(); });
+        break;
+      case 'nyan':
+        onStatus('[nyan] 🌈🐱 Nyan cat deployed');
+        funEffects.nyan();
+        break;
+      case 'confetti':
+        onStatus('[confetti] 🎉 Confetti blast fired');
+        funEffects.confetti();
         break;
     }
   };
