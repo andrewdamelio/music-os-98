@@ -114,69 +114,161 @@ export default function BootScreen() {
     );
   }
 
+  // Segmented Win95-style progress bar — 20 block segments
+  const SEGMENTS = 20;
+  const filledSegments = Math.round((progress / 100) * SEGMENTS);
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 99999,
-      background: '#000',
+      background: '#008080', // classic Win95 teal desktop
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: '"Courier New", Courier, monospace',
-      color: '#fff',
-      gap: 14,
+      fontFamily: 'Tahoma, "MS Sans Serif", Arial, sans-serif',
     }}>
-      <div style={{ fontSize: 52, lineHeight: 1 }}>🎵</div>
 
+      {/* ── Central dialog box ── */}
       <div style={{
-        fontSize: 40,
-        fontFamily: 'monospace',
-        color: '#00e5ff',
-        textShadow: '0 0 20px #00e5ff',
-        letterSpacing: 2,
+        background: '#d4d0c8',
+        border: '2px solid',
+        borderColor: '#ffffff #808080 #808080 #ffffff',
+        boxShadow: '4px 4px 0 #000000, inset 1px 1px 0 #dfdfdf',
+        width: 420,
+        userSelect: 'none',
       }}>
-        MusicOS 98
-      </div>
 
-      <div style={{ fontSize: 13, color: '#6678aa' }}>
-        Professional Music Production Environment
-      </div>
-
-      <div style={{
-        width: 300,
-        height: 20,
-        background: '#0a0a20',
-        border: '2px solid #c0c0c0',
-        marginTop: 8,
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
+        {/* Title bar */}
         <div style={{
-          position: 'absolute', left: 0, top: 0, bottom: 0,
-          width: `${progress}%`,
-          background: 'linear-gradient(to right, #000080, #00e5ff)',
-          transition: 'width 0.15s linear',
-        }} />
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 11, color: '#fff', fontFamily: 'monospace',
+          background: 'linear-gradient(90deg, #000080 0%, #1084d0 100%)',
+          padding: '3px 6px',
+          display: 'flex', alignItems: 'center', gap: 6,
+          borderBottom: '1px solid #000080',
         }}>
-          {progress}%
+          {/* Small music note icon in title bar */}
+          <svg width="14" height="14" viewBox="0 0 14 14">
+            <rect width="14" height="14" fill="none"/>
+            <rect x="7" y="2" width="2" height="8" rx="1" fill="white"/>
+            <path d="M9 2 Q13 3 11 7 Q9 5 9 6 Z" fill="white"/>
+            <ellipse cx="5.5" cy="11" rx="3" ry="2" transform="rotate(-10 5.5 11)" fill="white"/>
+          </svg>
+          <span style={{ color: 'white', fontSize: 11, fontWeight: 'bold', flex: 1 }}>
+            MusicOS 98
+          </span>
+          {/* Fake close/min/max buttons */}
+          {['_','□','✕'].map(ch => (
+            <div key={ch} style={{
+              width: 16, height: 14,
+              background: '#d4d0c8',
+              border: '1px solid', borderColor: '#ffffff #808080 #808080 #ffffff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 9, color: '#000', cursor: 'default',
+              fontFamily: 'Marlett, "Webdings", Arial, sans-serif',
+            }}>{ch}</div>
+          ))}
+        </div>
+
+        {/* Dialog body */}
+        <div style={{ padding: '20px 24px 18px' }}>
+
+          {/* Logo area */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+            {/* Large note icon */}
+            <div style={{
+              width: 64, height: 64, flexShrink: 0,
+              background: 'linear-gradient(135deg, #000080 0%, #0000aa 40%, #1060c0 100%)',
+              border: '2px solid', borderColor: '#ffffff #808080 #808080 #ffffff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="40" height="40" viewBox="0 0 40 40">
+                <defs>
+                  <linearGradient id="win95-note" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="100%" stopColor="#aaccff" />
+                  </linearGradient>
+                </defs>
+                <g fill="url(#win95-note)">
+                  <rect x="22" y="5" width="3" height="22" rx="1.5"/>
+                  <path d="M25 5 Q34 8 31 17 Q27 12 25 14 Z"/>
+                  <ellipse cx="17" cy="29" rx="7" ry="5" transform="rotate(-12 17 29)"/>
+                </g>
+              </svg>
+            </div>
+
+            {/* Title text */}
+            <div>
+              <div style={{
+                fontFamily: "'Arial Black', 'Arial Bold', Impact, Arial, sans-serif",
+                fontWeight: 900,
+                fontSize: 36,
+                lineHeight: 1,
+                color: '#000080',
+                textShadow: '1px 1px 0 #aaaacc',
+                letterSpacing: -1,
+              }}>
+                Music<span style={{ color: '#000080' }}>OS</span>
+                <span style={{
+                  fontSize: 30,
+                  color: '#cc4400',
+                  textShadow: '1px 1px 0 #ffaa88',
+                  marginLeft: 5,
+                }}>98</span>
+              </div>
+              <div style={{
+                fontSize: 10, color: '#444444',
+                marginTop: 3, letterSpacing: 1,
+              }}>
+                Professional Music Production Environment
+              </div>
+            </div>
+          </div>
+
+          {/* Separator */}
+          <div style={{
+            height: 2, marginBottom: 14,
+            borderTop: '1px solid #808080',
+            borderBottom: '1px solid #ffffff',
+          }} />
+
+          {/* Status text */}
+          <div style={{
+            fontSize: 11, color: '#000000',
+            marginBottom: 8, minHeight: 14,
+          }}>
+            {statusLine || 'Please wait...'}
+          </div>
+
+          {/* Win95 segmented progress bar */}
+          <div style={{
+            height: 20,
+            background: '#ffffff',
+            border: '1px solid', borderColor: '#808080 #ffffff #ffffff #808080',
+            padding: 2,
+            display: 'flex', gap: 2, alignItems: 'stretch',
+          }}>
+            {Array.from({ length: SEGMENTS }, (_, i) => (
+              <div key={i} style={{
+                flex: 1,
+                background: i < filledSegments ? '#000080' : 'transparent',
+                transition: i < filledSegments ? 'background 0.1s' : 'none',
+              }} />
+            ))}
+          </div>
+
         </div>
       </div>
 
-      <div style={{ fontSize: 11, color: '#6678aa', height: 16, fontFamily: 'monospace' }}>
-        {statusLine}
+      {/* Copyright text below dialog */}
+      <div style={{
+        marginTop: 14, fontSize: 10,
+        color: 'rgba(0,0,0,0.45)',
+        fontFamily: 'Tahoma, "MS Sans Serif", Arial, sans-serif',
+        textAlign: 'center',
+      }}>
+        Copyright © 1998 Beat Labs Inc. All rights reserved.
       </div>
 
-      <div style={{
-        position: 'absolute', bottom: 20,
-        fontSize: 11, color: '#333',
-        textAlign: 'center', fontFamily: 'monospace',
-      }}>
-        © 1998 Beat Labs Inc. — Built with Web Audio API
-      </div>
     </div>
   );
 }

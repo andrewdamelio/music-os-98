@@ -1082,7 +1082,8 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
         )} />
       )}
 
-      {/* Main sheep */}
+      {/* Main sheep — hidden during poo companion overlays to avoid bleed-through on transparent pixels.
+          Invisible drag-target div kept alive so the pet is still draggable during poo animations. */}
       <div
         onMouseDown={onMouseDown}
         style={sheepStyle(
@@ -1090,6 +1091,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
           {
             cursor: 'grab',
             pointerEvents: 'auto',
+            visibility: pooDisplay ? 'hidden' : 'visible',
             filter: stateRef.current === 'burn'
               ? 'drop-shadow(0 0 8px #ff6600) drop-shadow(0 0 16px #ff2200) brightness(1.2)'
               : 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
