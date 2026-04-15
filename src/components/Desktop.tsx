@@ -145,6 +145,17 @@ export default function Desktop() {
   const [petVisible, setPetVisible] = useState(false);
   const loadFileRef = useRef<HTMLInputElement>(null);
 
+  // SubSeven fun effect: rotate wallpaper
+  useEffect(() => {
+    const handler = () => setWallpaperIdx(i => {
+      const next = (i + 1) % WALLPAPERS.length;
+      localStorage.setItem('musicOS98_wallpaper', String(next));
+      return next;
+    });
+    window.addEventListener('s7:rotate-wallpaper', handler);
+    return () => window.removeEventListener('s7:rotate-wallpaper', handler);
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

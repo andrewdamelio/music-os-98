@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { audioEngine } from '../audio/engine';
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
 const VICTIM = {
@@ -84,19 +85,196 @@ const CHAT_HISTORY = [
 ];
 
 const FUN_ACTIONS = [
-  { label: 'Open/Close CD-ROM',     cmd: 'cdtray'    },
   { label: 'Flip Screen',           cmd: 'flip'      },
   { label: 'Swap Mouse Buttons',    cmd: 'swapMouse' },
   { label: 'Show Blue Screen',      cmd: 'bsod'      },
-  { label: 'Send Message Box',      cmd: 'msgbox'    },
   { label: 'Play Wav File',         cmd: 'playwav'   },
   { label: 'Hide Desktop Icons',    cmd: 'hideicons' },
-  { label: 'Lock Keyboard',         cmd: 'lockkeys'  },
   { label: 'Rotate Wallpaper',      cmd: 'wallpaper' },
   { label: 'Move Mouse to 0,0',     cmd: 'mousemove' },
   { label: 'Set Resolution 640×480',cmd: 'screenres' },
   { label: 'Fake Shutdown',         cmd: 'shutdown'  },
+  { label: 'Send Message Box',      cmd: 'msgbox'    },
 ];
+
+// ── Fun Effect Engine ─────────────────────────────────────────────────────────
+// Module-level so effects persist even if the SubSeven window is unmounted.
+let _clearFunEffect: (() => void) | null = null;
+
+function applyFunEffect(applyFn: () => () => void) {
+  if (_clearFunEffect) { _clearFunEffect(); _clearFunEffect = null; }
+  const undo = applyFn();
+  const handler = (e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    undo();
+    window.removeEventListener('keydown', handler);
+    _clearFunEffect = null;
+  };
+  window.addEventListener('keydown', handler);
+  _clearFunEffect = () => { undo(); window.removeEventListener('keydown', handler); };
+}
+
+function mkOverlay(bg: string, extra = ''): HTMLDivElement {
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;inset:0;z-index:999999;background:${bg};${extra}`;
+  return el;
+}
+
+const funEffects = {
+  flip(): () => void {
+    const prev = { t: document.body.style.transform, o: document.body.style.transformOrigin };
+    document.body.style.transform = 'rotate(180deg)';
+    document.body.style.transformOrigin = 'center center';
+    return () => { document.body.style.transform = prev.t; document.body.style.transformOrigin = prev.o; };
+  },
+
+  swapMouse(): () => void {
+    const h = (e: MouseEvent) => {
+      if (e.button === 0) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        (e.target as HTMLElement)?.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY,
+        }));
+      }
+    };
+    window.addEventListener('mousedown', h, true);
+    document.body.style.cursor = 'context-menu';
+    return () => { window.removeEventListener('mousedown', h, true); document.body.style.cursor = ''; };
+  },
+
+  bsod(): () => void {
+    const el = mkOverlay('#0000aa');
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'font-family:"Courier New",monospace;font-size:14px;color:white;padding:40px 80px;line-height:2;white-space:pre-wrap;';
+    pre.textContent = [
+      'Windows\n',
+      'A fatal exception 0E has occurred at 0028:C0011E36 in VXD VMM(01) +',
+      '00010E36. The current application will be terminated.\n',
+      '*  Press any key to terminate the current application.',
+      '*  Press CTRL+ALT+DEL again to restart your computer. You will',
+      '   lose any unsaved information in all applications.\n\n',
+      'Press any key to continue _',
+    ].join('\n');
+    el.appendChild(pre);
+    document.body.appendChild(el);
+    return () => el.remove();
+  },
+
+  msgbox(message: string): () => void {
+    const overlay = mkOverlay('rgba(0,0,0,0.45)', 'display:flex;align-items:center;justify-content:center;');
+    const dlg = document.createElement('div');
+    dlg.style.cssText = 'background:#c0c0c0;border:2px solid;border-color:#fff #808080 #808080 #fff;min-width:320px;max-width:480px;font-family:Tahoma,sans-serif;box-shadow:4px 4px 10px rgba(0,0,0,0.6);';
+
+    const titleBar = document.createElement('div');
+    titleBar.style.cssText = 'background:linear-gradient(to right,#000080,#1084d0);color:#fff;padding:3px 8px;font-size:12px;font-weight:bold;user-select:none;display:flex;justify-content:space-between;align-items:center;';
+    titleBar.textContent = 'SubSeven';
+    const xBtn = document.createElement('button');
+    xBtn.textContent = '✕';
+    xBtn.style.cssText = 'background:#c0c0c0;border:1px solid;border-color:#fff #808080 #808080 #fff;color:#000;font-size:10px;width:16px;height:14px;cursor:pointer;padding:0;line-height:1;';
+    xBtn.onclick = () => overlay.remove();
+    titleBar.appendChild(xBtn);
+
+    const body = document.createElement('div');
+    body.style.cssText = 'padding:20px;display:flex;align-items:flex-start;gap:14px;';
+    const icon = document.createElement('span');
+    icon.style.cssText = 'font-size:28px;flex-shrink:0;';
+    icon.textContent = 'ℹ️';
+    const msg = document.createElement('span');
+    msg.style.cssText = 'font-size:13px;line-height:1.5;';
+    msg.textContent = message;
+    body.appendChild(icon); body.appendChild(msg);
+
+    const foot = document.createElement('div');
+    foot.style.cssText = 'padding:10px;display:flex;justify-content:center;border-top:1px solid #808080;';
+    const okBtn = document.createElement('button');
+    okBtn.textContent = 'OK';
+    okBtn.style.cssText = 'background:#c0c0c0;border:2px solid;border-color:#fff #808080 #808080 #fff;padding:4px 24px;font-family:Tahoma;font-size:12px;cursor:pointer;min-width:80px;';
+    okBtn.onclick = () => overlay.remove();
+    foot.appendChild(okBtn);
+
+    dlg.appendChild(titleBar); dlg.appendChild(body); dlg.appendChild(foot);
+    overlay.appendChild(dlg);
+    document.body.appendChild(overlay);
+    return () => overlay.remove();
+  },
+
+  playwav(): void {
+    audioEngine.ensureRunning(() => {
+      const ctx = audioEngine.ctx!;
+      const notes = [523, 659, 784, 1047];
+      let t = ctx.currentTime + 0.01;
+      notes.forEach(f => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.frequency.value = f; osc.type = 'sine';
+        g.gain.setValueAtTime(0.25, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+        osc.connect(g); g.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.15);
+        t += 0.11;
+      });
+    });
+  },
+
+  hideicons(): () => void {
+    const icons = Array.from(document.querySelectorAll<HTMLElement>('.desktop-icon'));
+    icons.forEach(el => { el.style.visibility = 'hidden'; });
+    return () => icons.forEach(el => { el.style.visibility = ''; });
+  },
+
+  wallpaper(): void {
+    window.dispatchEvent(new CustomEvent('s7:rotate-wallpaper'));
+  },
+
+  mousemove(): () => void {
+    document.body.style.cursor = 'none';
+    const fake = document.createElement('div');
+    fake.style.cssText = [
+      'position:fixed;z-index:999999;pointer-events:none;',
+      'width:0;height:0;',
+      'border-left:8px solid white;border-bottom:8px solid transparent;border-right:8px solid transparent;',
+      'filter:drop-shadow(1px 1px 2px black);',
+      `left:${window.innerWidth / 2}px;top:${window.innerHeight / 2}px;`,
+      'transition:left 0.9s cubic-bezier(.4,0,.2,1),top 0.9s cubic-bezier(.4,0,.2,1);',
+    ].join('');
+    document.body.appendChild(fake);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      fake.style.left = '0px'; fake.style.top = '0px';
+    }));
+    return () => { fake.remove(); document.body.style.cursor = ''; };
+  },
+
+  screenres(): () => void {
+    const scale = Math.min(640 / window.innerWidth, 480 / window.innerHeight);
+    document.body.style.transform = `scale(${scale})`;
+    document.body.style.transformOrigin = 'top left';
+    document.body.style.width = `${(100 / scale).toFixed(2)}%`;
+    document.body.style.height = `${(100 / scale).toFixed(2)}%`;
+    return () => {
+      document.body.style.transform = '';
+      document.body.style.transformOrigin = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+    };
+  },
+
+  shutdown(): () => void {
+    const el = mkOverlay('#000080', 'display:flex;flex-direction:column;align-items:center;justify-content:center;');
+    const logo = document.createElement('div');
+    logo.style.cssText = 'font-family:Tahoma,sans-serif;color:#fff;text-align:center;margin-bottom:32px;';
+    logo.innerHTML = '<span style="font-size:32px;font-weight:bold;letter-spacing:3px;">Windows</span><span style="font-size:32px;font-style:italic;color:#ff8c00;font-weight:bold;">98</span>';
+    const msg = document.createElement('div');
+    msg.style.cssText = 'color:#fff;font-family:Tahoma,sans-serif;font-size:15px;';
+    msg.textContent = 'Windows is shutting down...';
+    const hint = document.createElement('div');
+    hint.style.cssText = 'position:absolute;bottom:40px;color:#aaa;font-family:Tahoma,sans-serif;font-size:11px;';
+    hint.textContent = 'Press any key to cancel';
+    el.appendChild(logo); el.appendChild(msg); el.appendChild(hint);
+    document.body.appendChild(el);
+    const tid = setTimeout(() => { msg.textContent = 'It is now safe to turn off your computer.'; }, 2200);
+    return () => { clearTimeout(tid); el.remove(); };
+  },
+};
 
 // ── Color palette matching SubSeven Legacy exactly ────────────────────────────
 const C = {
@@ -467,6 +645,44 @@ function PanelRegistry({ onStatus }: { onStatus: (s: string) => void }) {
 
 function PanelFunManager({ onStatus }: { onStatus: (s: string) => void }) {
   const [msgVal, setMsgVal] = useState('lol owned');
+
+  const fire = (cmd: string) => {
+    switch (cmd) {
+      case 'flip':
+        applyFunEffect(() => { onStatus('[flip] Screen flipped — press any key to restore'); return funEffects.flip(); });
+        break;
+      case 'swapMouse':
+        applyFunEffect(() => { onStatus('[swapMouse] Mouse buttons swapped — press any key to restore'); return funEffects.swapMouse(); });
+        break;
+      case 'bsod':
+        applyFunEffect(() => { onStatus('[bsod] Blue screen sent — press any key to restore'); return funEffects.bsod(); });
+        break;
+      case 'playwav':
+        onStatus('[playwav] Playing audio on victim...');
+        funEffects.playwav();
+        break;
+      case 'hideicons':
+        applyFunEffect(() => { onStatus('[hideicons] Desktop icons hidden — press any key to restore'); return funEffects.hideicons(); });
+        break;
+      case 'wallpaper':
+        onStatus('[wallpaper] Wallpaper rotated');
+        funEffects.wallpaper();
+        break;
+      case 'mousemove':
+        applyFunEffect(() => { onStatus('[mousemove] Mouse sent to 0,0 — press any key to restore'); return funEffects.mousemove(); });
+        break;
+      case 'screenres':
+        applyFunEffect(() => { onStatus('[screenres] Resolution set to 640×480 — press any key to restore'); return funEffects.screenres(); });
+        break;
+      case 'shutdown':
+        applyFunEffect(() => { onStatus('[shutdown] Fake shutdown initiated — press any key to cancel'); return funEffects.shutdown(); });
+        break;
+      case 'msgbox':
+        applyFunEffect(() => { onStatus(`[msgbox] "${msgVal}" → ${VICTIM.hostname}`); return funEffects.msgbox(msgVal); });
+        break;
+    }
+  };
+
   return (
     <div style={{ padding: 10, overflowY: 'auto', height: '100%' }}>
       <div style={{ fontSize: 11, color: C.accent, fontFamily: 'Tahoma, sans-serif',
@@ -474,9 +690,9 @@ function PanelFunManager({ onStatus }: { onStatus: (s: string) => void }) {
         fun manager — {VICTIM.hostname}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 12 }}>
-        {FUN_ACTIONS.map(a => (
+        {FUN_ACTIONS.filter(a => a.cmd !== 'msgbox').map(a => (
           <button key={a.cmd} style={{ ...btn98, textAlign: 'left', padding: '4px 8px', fontSize: 11 }}
-            onClick={() => onStatus(`[${a.cmd}] → sent to ${VICTIM.hostname}`)}>
+            onClick={() => fire(a.cmd)}>
             {a.label}
           </button>
         ))}
@@ -488,7 +704,7 @@ function PanelFunManager({ onStatus }: { onStatus: (s: string) => void }) {
         <div style={{ display: 'flex', gap: 6 }}>
           <input value={msgVal} onChange={e => setMsgVal(e.target.value)}
             style={{ ...input98, flex: 1 }} />
-          <button style={btn98} onClick={() => onStatus(`[msgbox] "${msgVal}" → ${VICTIM.hostname}`)}>
+          <button style={btn98} onClick={() => fire('msgbox')}>
             send
           </button>
         </div>
