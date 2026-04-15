@@ -878,15 +878,22 @@ class AudioEngine {
   start() {
     if (!this.ctx) this.init();
     if (!this.ctx) return; // AudioContext unavailable
-    if (this.ctx.state === 'suspended') this.ctx.resume();
     if (this.isPlaying) return;
-    this.isPlaying = true;
-    this.currentStep = -1;
-    this.stepIndex = 0;
-    this.nextNoteTime = this.ctx.currentTime + 0.05;
-    this.pianoRollBeat = 0;
-    this.pianoRollDisplayBeat = 0;
-    this.scheduler();
+    const _doStart = () => {
+      if (this.isPlaying) return;
+      this.isPlaying = true;
+      this.currentStep = -1;
+      this.stepIndex = 0;
+      this.nextNoteTime = this.ctx!.currentTime + 0.05;
+      this.pianoRollBeat = 0;
+      this.pianoRollDisplayBeat = 0;
+      this.scheduler();
+    };
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume().then(_doStart);
+    } else {
+      _doStart();
+    }
   }
 
   stop() {

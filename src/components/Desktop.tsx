@@ -51,6 +51,48 @@ import DesktopPet from './DesktopPet';
 import SubSeven from '../apps/SubSeven';
 import ControlPanel from '../apps/ControlPanel';
 
+function SubSevenIcon({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="s7metal" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%"   stopColor="#e8eef8" />
+          <stop offset="18%"  stopColor="#ffffff" />
+          <stop offset="38%"  stopColor="#b8c8d8" />
+          <stop offset="55%"  stopColor="#8898a8" />
+          <stop offset="72%"  stopColor="#d0dce8" />
+          <stop offset="88%"  stopColor="#a0b0c0" />
+          <stop offset="100%" stopColor="#687888" />
+        </linearGradient>
+        <linearGradient id="s7shine" x1="0%" y1="0%" x2="60%" y2="100%">
+          <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.9" />
+          <stop offset="40%"  stopColor="#ffffff" stopOpacity="0.0" />
+        </linearGradient>
+        <filter id="s7shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="1.5" dy="2" stdDeviation="1.2" floodColor="#000000" floodOpacity="0.8"/>
+        </filter>
+      </defs>
+      {/* Navy background */}
+      <rect width="32" height="32" fill="#0d2244" rx="1"/>
+      {/* The "7" shape — thick chunky bold serif 7 */}
+      {/* Top horizontal bar */}
+      <path
+        d="M5,4 L27,4 L27,9 L5,9 Z"
+        fill="url(#s7metal)" filter="url(#s7shadow)"
+      />
+      {/* Diagonal stem going bottom-right */}
+      <path
+        d="M17,9 L27,9 L20,28 L10,28 Z"
+        fill="url(#s7metal)" filter="url(#s7shadow)"
+      />
+      {/* Shine overlay on top bar */}
+      <path d="M5,4 L27,4 L27,6.5 L5,6.5 Z" fill="url(#s7shine)" opacity="0.6"/>
+      {/* Shine overlay on stem left edge */}
+      <path d="M10,10 L14,10 L11,24 L10,28 L9,28 Z" fill="url(#s7shine)" opacity="0.4"/>
+    </svg>
+  );
+}
+
 const APP_MAP: Record<string, React.ComponentType> = {
   DrumMachine,
   Synth,
@@ -89,7 +131,7 @@ const DESKTOP_ICONS = [
   { id: 'ski-free', label: 'SkiFree', icon: '⛷️' },
   { id: 'screen-mate', label: 'Screen Mate Poo', icon: '🐑', iconImg: { src: scmpoo103, frame: 0 } },
   { id: 'milkdrop', label: 'MilkDrop Viz', icon: '🌊' },
-  { id: 'sub-seven', label: 'SubSeven', icon: '💀' },
+  { id: 'sub-seven', label: 'SubSeven', icon: '💀', iconSvg: true },
 ];
 
 export default function Desktop() {
@@ -202,6 +244,8 @@ export default function Desktop() {
                   backgroundSize: 'auto 32px',
                   imageRendering: 'pixelated',
                 }} />
+              ) : (icon as { iconSvg?: boolean }).iconSvg ? (
+                <SubSevenIcon size={32} />
               ) : (
                 <div className="desktop-icon-emoji">{icon.icon}</div>
               )}

@@ -73,22 +73,44 @@ function AudioContextStatus() {
   useEffect(() => {
     const update = () => setState(audioEngine.ctx?.state ?? 'not started');
     update();
-    const id = setInterval(update, 1000);
+    const id = setInterval(update, 500);
     return () => clearInterval(id);
   }, []);
 
   const color = state === 'running' ? 'var(--px-green)' : state === 'suspended' ? '#ffaa00' : 'var(--px-text-dim)';
 
+  const resume = () => {
+    if (!audioEngine.ctx) audioEngine.init();
+    audioEngine.ctx?.resume();
+  };
+
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 8,
-      fontSize: 9, color: 'var(--px-text-dim)', letterSpacing: 1,
-      padding: '8px 16px', background: 'var(--px-bg2)',
-      border: '1px solid var(--px-border)', borderRadius: 4,
-    }}>
-      <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, boxShadow: state === 'running' ? `0 0 5px ${color}` : 'none' }} />
-      <span>AudioContext: </span>
-      <span style={{ color }}>{state}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        fontSize: 9, color: 'var(--px-text-dim)', letterSpacing: 1,
+        padding: '8px 16px', background: 'var(--px-bg2)',
+        border: '1px solid var(--px-border)', borderRadius: 4,
+      }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, boxShadow: state === 'running' ? `0 0 5px ${color}` : 'none' }} />
+        <span>AudioContext: </span>
+        <span style={{ color }}>{state}</span>
+      </div>
+      {state !== 'running' && (
+        <button
+          onClick={resume}
+          style={{
+            cursor: 'pointer', borderRadius: 3, padding: '8px 0',
+            fontSize: 10, letterSpacing: 1, fontFamily: 'inherit',
+            background: 'linear-gradient(to bottom, #003300, #001a00)',
+            color: '#44ff88',
+            border: '1px solid #33ff66',
+            boxShadow: '0 0 8px #33ff6644',
+          }}
+        >
+          ▶ RESUME AUDIO
+        </button>
+      )}
     </div>
   );
 }
