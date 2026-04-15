@@ -48,6 +48,8 @@ import EQ from '../apps/EQ';
 import MilkDrop from '../apps/MilkDrop';
 import scmpoo103 from '../assets/scmpoo103.png';
 import DesktopPet from './DesktopPet';
+import SubSeven from '../apps/SubSeven';
+import ControlPanel from '../apps/ControlPanel';
 
 const APP_MAP: Record<string, React.ComponentType> = {
   DrumMachine,
@@ -66,6 +68,8 @@ const APP_MAP: Record<string, React.ComponentType> = {
   Compressor,
   EQ,
   MilkDrop,
+  SubSeven,
+  ControlPanel,
 };
 
 const DESKTOP_ICONS = [
@@ -85,7 +89,7 @@ const DESKTOP_ICONS = [
   { id: 'ski-free', label: 'SkiFree', icon: '⛷️' },
   { id: 'screen-mate', label: 'Screen Mate Poo', icon: '🐑', iconImg: { src: scmpoo103, frame: 0 } },
   { id: 'milkdrop', label: 'MilkDrop Viz', icon: '🌊' },
-  { id: 'help', label: 'Help', icon: '❓' },
+  { id: 'sub-seven', label: 'SubSeven', icon: '💀' },
 ];
 
 export default function Desktop() {
@@ -122,7 +126,7 @@ export default function Desktop() {
           return next;
         }),
       },
-      { label: '⚙️ Audio Settings (FX Rack)', action: () => openApp('fx-rack') },
+      { label: '🔊 Audio Control Panel', action: () => openApp('control-panel') },
       { separator: true, label: '', action: () => {} },
       {
         label: '🆕 New Project', action: () => {

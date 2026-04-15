@@ -247,9 +247,7 @@ export default function PianoRoll() {
                     onMouseEnter={() => setHoveredKey(midi)}
                     onMouseLeave={() => setHoveredKey(null)}
                     onMouseDown={() => {
-                      audioEngine.init();
-                      if (audioEngine.ctx?.state === 'suspended') audioEngine.ctx.resume();
-                      audioEngine.noteOn(midi, 1);
+                      audioEngine.ensureRunning(() => audioEngine.noteOn(midi, 1));
                       const up = () => { audioEngine.noteOff(midi, 1); window.removeEventListener('mouseup', up); };
                       window.addEventListener('mouseup', up);
                     }}

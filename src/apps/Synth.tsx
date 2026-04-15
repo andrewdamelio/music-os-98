@@ -403,11 +403,10 @@ export default function Synth() {
 
   // Direct noteOn that stores the shifted note in the ref
   const triggerNoteOn = useCallback((visualNote: number, ref: Map<number, number> | null, shiftAtPress: number) => {
-    audioEngine.init();
-    if (audioEngine.ctx?.state === 'suspended') audioEngine.ctx.resume();
     const shifted = visualNote + shiftAtPress * 12;
     if (ref) ref.set(visualNote, shifted);
-    audioEngine.noteOn(shifted, channelIndex);
+    // Ensure context is running before scheduling — avoids the async-resume latency spike
+    audioEngine.ensureRunning(() => audioEngine.noteOn(shifted, channelIndex));
     // Store actual MIDI pitch — rendering checks pressedKeys.has(note) directly
     setPressedKeys(prev => new Set([...prev, shifted]));
     return shifted;
@@ -428,9 +427,8 @@ export default function Synth() {
       if (baseNote !== undefined && !keyboardHeldNotes.current.has(key)) {
         const shifted = baseNote + octaveShift * 12;
         keyboardHeldNotes.current.set(key, { shifted, visual: baseNote });
-        audioEngine.init();
-        if (audioEngine.ctx?.state === 'suspended') audioEngine.ctx.resume();
-        audioEngine.noteOn(shifted, channelIndex);
+        // Ensure context is running before scheduling — avoids async-resume latency spike
+        audioEngine.ensureRunning(() => audioEngine.noteOn(shifted, channelIndex));
         // Store actual MIDI pitch
         setPressedKeys(prev => new Set([...prev, shifted]));
       }

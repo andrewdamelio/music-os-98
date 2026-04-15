@@ -91,42 +91,33 @@ export default function Taskbar() {
         {/* System tray */}
         <div className="taskbar-tray">
 
-          {/* ICQ */}
-          <div title="ICQ — You've got a message!" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1px 2px' }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" style={{ display: 'block' }}>
-              {/* 8 petals */}
-              <circle cx="7"   cy="3.8" r="2" fill="#2ec82e" />
-              <circle cx="9.3" cy="4.8" r="2" fill="#26b226" />
-              <circle cx="10.2" cy="7" r="2" fill="#2ec82e" />
-              <circle cx="9.3" cy="9.2" r="2" fill="#26b226" />
-              <circle cx="7"   cy="10.2" r="2" fill="#2ec82e" />
-              <circle cx="4.7" cy="9.2" r="2" fill="#26b226" />
-              <circle cx="3.8" cy="7" r="2" fill="#2ec82e" />
-              <circle cx="4.7" cy="4.8" r="2" fill="#26b226" />
-              {/* Centre */}
-              <circle cx="7" cy="7" r="2.9" fill="#ffe033" />
-              <circle cx="7" cy="7" r="1.4" fill="#e6c200" />
-            </svg>
-          </div>
-
-          {/* Dial-up connection */}
-          <div title="Dial-Up Networking — Connected at 56Kbps" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1px 2px' }}>
-            <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block' }}>
-              {/* Left monitor */}
-              <rect x="0.5" y="2" width="5.5" height="4.5" rx="0.5" fill="#d4d0c8" stroke="#888" strokeWidth="0.5"/>
-              <rect x="1"   y="2.4" width="4.5" height="3.6" fill="#000080"/>
-              <rect x="2.2" y="6.5" width="2" height="0.9" fill="#a0a0a0"/>
-              <rect x="1.5" y="7.3" width="3.5" height="0.6" fill="#808080"/>
-              {/* Signal squiggle */}
-              <path d="M6 4.5 C8 2, 10 7, 12 4" stroke="#ff8800" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-              {/* Right monitor */}
-              <rect x="14" y="2" width="5.5" height="4.5" rx="0.5" fill="#d4d0c8" stroke="#888" strokeWidth="0.5"/>
-              <rect x="14.5" y="2.4" width="4.5" height="3.6" fill="#000080"/>
-              <rect x="15.8" y="6.5" width="2" height="0.9" fill="#a0a0a0"/>
-              <rect x="15"   y="7.3" width="3.5" height="0.6" fill="#808080"/>
-              {/* Activity lights — green TX left, amber RX right */}
-              <circle cx="5.2" cy="2.7" r="0.7" fill="#00e000"/>
-              <circle cx="14.8" cy="2.7" r="0.7" fill="#ffaa00"/>
+          {/* ICQ — flower logo: 8 petals (7 green + 1 red), yellow center, black outline */}
+          <div title="ICQ — You've got a message! (UIN: 1337420)" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1px 2px' }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" style={{ display: 'block' }}>
+              <g transform="translate(8,8)">
+                {/* Black outline layer — slightly larger petals drawn first */}
+                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" />
+                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(45)" />
+                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(90)" />
+                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(135)" />
+                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(180)" />
+                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(225)" />
+                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(270)" />
+                <ellipse cx="0" cy="-4.0" rx="2.1" ry="3.1" fill="black" transform="rotate(315)" />
+                {/* Colored petals — 7 green, 1 red (lower-left at 225°) */}
+                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" />
+                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(45)" />
+                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(90)" />
+                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(135)" />
+                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(180)" />
+                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#ee0000" transform="rotate(225)" />
+                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(270)" />
+                <ellipse cx="0" cy="-4.0" rx="1.5" ry="2.5" fill="#00ee00" transform="rotate(315)" />
+                {/* Black center ring */}
+                <circle cx="0" cy="0" r="2.0" fill="black" />
+                {/* Yellow center dot */}
+                <circle cx="0" cy="0" r="1.4" fill="#ffcc00" />
+              </g>
             </svg>
           </div>
 

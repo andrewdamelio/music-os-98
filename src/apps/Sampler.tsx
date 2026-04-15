@@ -92,24 +92,23 @@ export default function Sampler() {
   };
 
   const playSample = (sample: Sample) => {
-    if (!audioEngine.ctx) audioEngine.init();
-    const ctx = audioEngine.ctx!;
-    if (ctx.state === 'suspended') ctx.resume();
+    audioEngine.ensureRunning(() => {
+      const ctx = audioEngine.ctx!;
+      const source = ctx.createBufferSource();
+      source.buffer = sample.buffer;
+      source.playbackRate.value = Math.pow(2, sample.pitch / 12);
+      source.loop = sample.loop;
 
-    const source = ctx.createBufferSource();
-    source.buffer = sample.buffer;
-    source.playbackRate.value = Math.pow(2, sample.pitch / 12);
-    source.loop = sample.loop;
+      const g = ctx.createGain();
+      g.connect(audioEngine.mixerInputs[2] || audioEngine.masterGain!);
+      source.connect(g);
 
-    const g = ctx.createGain();
-    g.connect(audioEngine.mixerInputs[2] || audioEngine.masterGain!);
-    source.connect(g);
-
-    const dur = sample.buffer.duration;
-    const startTime = sample.start * dur;
-    const endTime = sample.end * dur;
-    source.start(ctx.currentTime, startTime, endTime - startTime);
-    if (!sample.loop) setTimeout(() => { try { source.stop(); } catch {} }, (endTime - startTime) * 1000 + 100);
+      const dur = sample.buffer.duration;
+      const startTime = sample.start * dur;
+      const endTime = sample.end * dur;
+      source.start(ctx.currentTime, startTime, endTime - startTime);
+      if (!sample.loop) setTimeout(() => { try { source.stop(); } catch {} }, (endTime - startTime) * 1000 + 100);
+    });
   };
 
   const updateSample = (id: string, update: Partial<Sample>) => {

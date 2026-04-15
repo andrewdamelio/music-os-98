@@ -59,6 +59,7 @@ const MENU: TopItem[] = [
     items: [
       { label: 'SkiFree',    icon: '⛷️', appId: 'ski-free' },
       { label: 'Screen Mate Poo', icon: '🐑', appId: 'screen-mate' },
+      { label: 'SubSeven',  icon: '💀', appId: 'sub-seven' },
     ],
   },
   {

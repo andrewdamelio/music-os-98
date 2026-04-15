@@ -61,13 +61,13 @@ function VUMeter({ channelIdx, color }: { channelIdx: number; color: string }) {
 // ── Pan Knob ──────────────────────────────────────────────────────────────────
 function PanKnob({ value, onChange, color }: { value: number; onChange: (v: number) => void; color: string }) {
   const angle = value * 135;
-  const dragRef = useRef<{ y: number; v: number } | null>(null);
+  const dragRef = useRef<{ x: number; v: number } | null>(null);
   const onMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
-    dragRef.current = { y: e.clientY, v: value };
+    dragRef.current = { x: e.clientX, v: value };
     const onMove = (me: MouseEvent) => {
       if (!dragRef.current) return;
-      onChange(Math.max(-1, Math.min(1, dragRef.current.v + (dragRef.current.y - me.clientY) / 60)));
+      onChange(Math.max(-1, Math.min(1, dragRef.current.v + (me.clientX - dragRef.current.x) / 60)));
     };
     const onUp = () => { dragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
@@ -75,7 +75,7 @@ function PanKnob({ value, onChange, color }: { value: number; onChange: (v: numb
   return (
     <div title={`Pan: ${value === 0 ? 'C' : value > 0 ? `R${Math.round(value * 100)}` : `L${Math.round(-value * 100)}`}`}
       onMouseDown={onMouseDown} onDoubleClick={() => onChange(0)}
-      style={{ width: 26, height: 26, borderRadius: '50%', cursor: 'ns-resize', position: 'relative',
+      style={{ width: 26, height: 26, borderRadius: '50%', cursor: 'ew-resize', position: 'relative',
         background: 'radial-gradient(circle at 35% 30%, #7a7c98, #32344a)',
         boxShadow: '0 2px 6px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,255,255,0.28), 0 0 0 1px #111',
       }}>
@@ -338,7 +338,7 @@ export default function Mixer() {
             background: 'linear-gradient(to bottom, #e8e8f8, #888899)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             filter: 'drop-shadow(0 1px 3px rgba(255,255,255,0.15))' }}>CONSOLE</div>
-          <div style={{ fontSize: 7, color: '#3a3c50', letterSpacing: 2 }}>MusicOS 98 · 8ch MIXING DESK</div>
+          <div style={{ fontSize: 7, color: '#3a3c50', letterSpacing: 2 }}>MusicOS 98 · MIXING DESK</div>
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
@@ -350,8 +350,8 @@ export default function Mixer() {
       {/* Strips */}
       <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
         <div style={{ display: 'flex', gap: 3, padding: '0 10px', height: '100%', alignItems: 'flex-start' }}>
-          {/* Input channels 0–3 (Drums, Synth, Pads, Keys) */}
-          {[0,1,2,3].map(i => <ChannelStrip key={i} index={i} />)}
+          {/* Input channels 0–2 (Drums, Synth, Pads) */}
+          {[0,1,2].map(i => <ChannelStrip key={i} index={i} />)}
           {/* Divider */}
           <div style={{ width: 2, alignSelf: 'stretch', margin: '0 5px',
             background: 'linear-gradient(to bottom, transparent, #383050, transparent)', flexShrink: 0 }} />

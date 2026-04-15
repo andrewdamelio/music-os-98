@@ -98,9 +98,9 @@ export default function DrumMachine() {
   } = useOSStore();
 
   const handlePreviewDrum = (channel: number) => {
-    audioEngine.init();
-    if (audioEngine.ctx?.state === 'suspended') audioEngine.ctx.resume();
-    audioEngine.triggerDrum(DRUM_CHANNELS[channel], (audioEngine.ctx?.currentTime ?? 0) + audioEngine.scheduleOffset);
+    audioEngine.ensureRunning(() => {
+      audioEngine.triggerDrum(DRUM_CHANNELS[channel], audioEngine.ctx!.currentTime + audioEngine.scheduleOffset);
+    });
   };
 
   const LABEL_W = 90;

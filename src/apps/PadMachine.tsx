@@ -238,43 +238,42 @@ export default function PadMachine() {
   const triggerPad = useCallback((padIdx: number) => {
     const pad = pads[padIdx];
     if (!pad.buffer) return;
-    audioEngine.init();
-    if (audioEngine.ctx?.state === 'suspended') audioEngine.ctx.resume();
-    const ctx = audioEngine.ctx!;
-
-    if (pad.mode === 'hold') {
-      const existing = padHoldSources.get(padIdx);
-      if (existing) {
-        try { existing.stop(); } catch {}
-        padHoldSources.delete(padIdx);
-        setActivePads(prev => { const s = new Set(prev); s.delete(padIdx); return s; });
-        return;
+    audioEngine.ensureRunning(() => {
+      const ctx = audioEngine.ctx!;
+      if (pad.mode === 'hold') {
+        const existing = padHoldSources.get(padIdx);
+        if (existing) {
+          try { existing.stop(); } catch {}
+          padHoldSources.delete(padIdx);
+          setActivePads(prev => { const s = new Set(prev); s.delete(padIdx); return s; });
+          return;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = pad.buffer!;
+        src.loop = true;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.9;
+        src.connect(gain);
+        gain.connect(audioEngine.mixerInputs[2] ?? audioEngine.masterGain!);
+        src.start();
+        padHoldSources.set(padIdx, src);
+        setActivePads(prev => new Set([...prev, padIdx]));
+        src.onended = () => {
+          padHoldSources.delete(padIdx);
+          setActivePads(prev => { const s = new Set(prev); s.delete(padIdx); return s; });
+        };
+      } else {
+        const src = ctx.createBufferSource();
+        src.buffer = pad.buffer!;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.9;
+        src.connect(gain);
+        gain.connect(audioEngine.mixerInputs[2] ?? audioEngine.masterGain!);
+        src.start();
+        setActivePads(prev => new Set([...prev, padIdx]));
+        src.onended = () => setActivePads(prev => { const s = new Set(prev); s.delete(padIdx); return s; });
       }
-      const src = ctx.createBufferSource();
-      src.buffer = pad.buffer;
-      src.loop = true;
-      const gain = ctx.createGain();
-      gain.gain.value = 0.9;
-      src.connect(gain);
-      gain.connect(audioEngine.mixerInputs[2] ?? audioEngine.masterGain!);
-      src.start();
-      padHoldSources.set(padIdx, src);
-      setActivePads(prev => new Set([...prev, padIdx]));
-      src.onended = () => {
-        padHoldSources.delete(padIdx);
-        setActivePads(prev => { const s = new Set(prev); s.delete(padIdx); return s; });
-      };
-    } else {
-      const src = ctx.createBufferSource();
-      src.buffer = pad.buffer;
-      const gain = ctx.createGain();
-      gain.gain.value = 0.9;
-      src.connect(gain);
-      gain.connect(audioEngine.mixerInputs[2] ?? audioEngine.masterGain!);
-      src.start();
-      setActivePads(prev => new Set([...prev, padIdx]));
-      src.onended = () => setActivePads(prev => { const s = new Set(prev); s.delete(padIdx); return s; });
-    }
+    });
   }, [pads]);
 
   // NOTE: no cleanup on unmount — hold pads intentionally keep playing after close

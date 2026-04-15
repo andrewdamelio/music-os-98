@@ -166,8 +166,21 @@ class AudioEngine {
   recordedChunks: Blob[] = [];
   recordingStream: MediaStream | null = null;
 
-  // Tiny epsilon so notes don't land exactly on currentTime (avoids scheduling glitches)
-  get scheduleOffset(): number { return 0.001; }
+  // Schedule offset: use baseLatency (one audio frame) so notes always land in the next
+  // processing block. Falls back to 0.005 on browsers that don't expose baseLatency yet.
+  get scheduleOffset(): number {
+    return this.ctx ? (this.ctx.baseLatency || 0.005) : 0.005;
+  }
+
+  // Ensures the context is running, then calls fn. Always synchronous if context is
+  // already running; async path only fires on first interaction or after tab-hide resume.
+  ensureRunning(fn: () => void) {
+    this.init();
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (ctx.state === 'running') { fn(); return; }
+    ctx.resume().then(fn);
+  }
 
   init() {
     if (this.ctx) return;
@@ -796,6 +809,8 @@ class AudioEngine {
   }
 
   setChannelPan(ch: number, pan: number) {
+    // ch 7 (master) has no signal routed through its panner — skip
+    if (ch === 7) return;
     if (this.mixerPanners[ch]) this.mixerPanners[ch].pan.value = pan;
   }
 

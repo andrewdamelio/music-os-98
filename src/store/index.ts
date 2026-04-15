@@ -73,7 +73,7 @@ export interface PianoNote {
 export const APPS: AppDef[] = [
   { id: 'drum-machine', title: 'Beat Machine', icon: '🥁', component: 'DrumMachine', defaultSize: { w: 820, h: 420 }, singleton: true },
   { id: 'synth', title: 'SynthStation', icon: '🎹', component: 'Synth', defaultSize: { w: 860, h: 540 }, singleton: true },
-  { id: 'mixer', title: 'Mixer', icon: '🎚️', component: 'Mixer', defaultSize: { w: 540, h: 500 }, singleton: true },
+  { id: 'mixer', title: 'Mixer', icon: '🎚️', component: 'Mixer', defaultSize: { w: 460, h: 580 }, singleton: true },
   { id: 'piano-roll', title: 'Piano Roll', icon: '🎼', component: 'PianoRoll', defaultSize: { w: 820, h: 540 }, singleton: true },
   { id: 'fx-rack', title: 'FX Rack', icon: '🎛️', component: 'FXRack', defaultSize: { w: 540, h: 660 }, singleton: true },
   { id: 'sampler', title: 'Sampler', icon: '💿', component: 'Sampler', defaultSize: { w: 580, h: 460 }, singleton: true },
@@ -88,6 +88,8 @@ export const APPS: AppDef[] = [
   { id: 'pad-machine', title: 'Pad Machine', icon: '🎮', component: 'PadMachine', defaultSize: { w: 720, h: 540 }, singleton: true },
   { id: 'ski-free', title: 'SkiFree', icon: '⛷️', component: 'SkiFree', defaultSize: { w: 600, h: 480 }, singleton: true },
   { id: 'screen-mate', title: 'Screen Mate Poo', icon: '🐑', component: 'ScreenMate', defaultSize: { w: 400, h: 300 }, singleton: false },
+  { id: 'sub-seven', title: 'SubSeven 2.2 [G]old', icon: '💀', component: 'SubSeven', defaultSize: { w: 680, h: 520 }, singleton: true },
+  { id: 'control-panel', title: 'Audio Control Panel', icon: '🔊', component: 'ControlPanel', defaultSize: { w: 320, h: 320 }, singleton: true },
 ];
 
 let zCounter = 100;
@@ -223,9 +225,11 @@ export const useOSStore = create<OSStore>((set, get) => ({
     }
 
     const instanceId = `${appId}-${Date.now()}`;
-    const viewport = { w: window.innerWidth, h: window.innerHeight - 60 };
+    const TRANSPORT_H = 52; // transport bar is fixed at top ~48px + small gap
+    const TASKBAR_H = 60;
+    const viewport = { w: window.innerWidth, h: window.innerHeight - TASKBAR_H };
     const x = pos?.x ?? Math.max(20, Math.floor(Math.random() * (viewport.w - app.defaultSize.w - 40)));
-    const y = pos?.y ?? Math.max(30, Math.floor(Math.random() * (viewport.h - app.defaultSize.h - 80)));
+    const y = pos?.y ?? Math.max(TRANSPORT_H, TRANSPORT_H + Math.floor(Math.random() * Math.max(0, viewport.h - app.defaultSize.h - TRANSPORT_H - 40)));
 
     const newWindow: WindowState = {
       instanceId,
@@ -659,8 +663,23 @@ export const useOSStore = create<OSStore>((set, get) => ({
       const channels = s.mixerChannels.map((c, i) => i === ch ? { ...c, ...update } : c);
       if (update.gain !== undefined) audioEngine.setChannelGain(ch, update.gain);
       if (update.pan !== undefined) audioEngine.setChannelPan(ch, update.pan);
-      if (update.muted !== undefined) audioEngine.setChannelMute(ch, update.muted);
       if (update.fxSend !== undefined) audioEngine.setChannelSend(ch, update.fxSend);
+
+      // FX bus (6) and master (7) mute directly — not part of solo logic
+      if (update.muted !== undefined && ch >= 6) {
+        audioEngine.setChannelMute(ch, update.muted);
+      }
+
+      // Solo/mute logic: channels 0-5 are instrument buses
+      // When any channel is soloed, only soloed channels pass audio — mute state is preserved
+      // but overridden by solo. When all solos are cleared, restore each channel's own mute flag.
+      const anySolo = channels.slice(0, 6).some(c => c.solo);
+      channels.forEach((c, i) => {
+        if (i >= 6) return; // leave FX bus and master alone
+        const effectiveMute = anySolo ? !c.solo : c.muted;
+        audioEngine.setChannelMute(i, effectiveMute);
+      });
+
       return { mixerChannels: channels };
     });
   },
