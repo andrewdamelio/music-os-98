@@ -19,8 +19,11 @@ const RENDER_H = Math.round(TILE_H * SCALE);
 // Scmpoo sprite sheets: 640×40, 16 frames × 40px each
 const S_FW = 40;
 const S_FH = 40;
-// Scale poo companion to match the sheep's rendered width exactly
-const POO_SCALE = RENDER_W / S_FW; // 32/40 = 0.8
+// Scale poo companion to match the sheep's rendered HEIGHT so the silhouette
+// doesn't appear to shrink when the overlay swaps in (sheep is 32×34, scmpoo
+// tile is square, so width-matching caused a 2px vertical shrink on overlay).
+const POO_SCALE = RENDER_H / S_FH; // 34/40 = 0.85
+const POO_RENDER_W = Math.round(S_FW * POO_SCALE);
 function scmpooStyle(sheet: string, frameIdx: number, x: number, y: number, scale = 2): React.CSSProperties {
   return {
     position: 'fixed',
@@ -109,7 +112,9 @@ const ANIMS: Record<SheepState, AnimDef> = {
     },
   },
   walk: {
-    frames: [{ idx: 2, ms: 180 }, { idx: 3, ms: 180 }],
+    // Frames 4/5 are the mid-stride leg poses (2 legs visible); 2/3 are stand poses
+    // with all 4 legs planted, which makes the walk look stuttery. Alternate 4/5 only.
+    frames: [{ idx: 4, ms: 200 }, { idx: 5, ms: 200 }],
     loop: true, vx: 0.5,
     next: () => { const r = Math.random(); if (r < 0.15) return 'idle'; if (r < 0.25) return 'run_begin'; return 'walk'; },
   },
@@ -163,7 +168,7 @@ const ANIMS: Record<SheepState, AnimDef> = {
     loop: false, vx: 0, next: () => 'idle',
   },
   seek: {
-    frames: [{ idx: 2, ms: 180 }, { idx: 3, ms: 180 }],
+    frames: [{ idx: 4, ms: 170 }, { idx: 5, ms: 170 }],
     loop: true, vx: 0.6, next: () => 'idle',
   },
   sit: {
@@ -204,7 +209,7 @@ const ANIMS: Record<SheepState, AnimDef> = {
   },
   climb_prep: {
     // Walk toward edge — movement handled in tick
-    frames: [{ idx: 2, ms: 180 }, { idx: 3, ms: 180 }],
+    frames: [{ idx: 4, ms: 200 }, { idx: 5, ms: 200 }],
     loop: true, vx: 0.5, next: () => 'climb_up',
   },
   climb_up: {
@@ -421,7 +426,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       }
       // Show poo sprite aligned with sheep position (centred, bottom-aligned)
       const pooRenderedH = Math.round(S_FH * POO_SCALE);
-      const px = pos.x;
+      const px = pos.x + Math.round((RENDER_W - POO_RENDER_W) / 2);
       const py = pos.y + (RENDER_H - pooRenderedH);
       setPooDisplay({ sheet: pooRef.current!.sheet, frame: pooRef.current!.frames[0], x: px, y: py });
     } else if (POO_STATES.includes(stateRef.current)) {
@@ -702,7 +707,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
         const frameIdx = Math.floor(elapsed / poo.frameDuration);
         const frame = poo.frames[frameIdx];
         const pooRenderedH = Math.round(S_FH * POO_SCALE);
-        const px = pos.x;
+        const px = pos.x + Math.round((RENDER_W - POO_RENDER_W) / 2);
         const py = pos.y + (RENDER_H - pooRenderedH);
         setPooDisplay({ sheet: poo.sheet, frame, x: px, y: py });
       }
