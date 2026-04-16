@@ -338,6 +338,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
   const [flowerEating, setFlowerEating] = useState(false);
   const [bathtubProp, setBathtubProp] = useState<{ x: number; y: number; frame: number } | null>(null);
   const bathtubPropRef = useRef<{ x: number; y: number; frame: number; startTs: number; splash?: boolean } | null>(null);
+  const [splashHideSheep, setSplashHideSheep] = useState(false);
   const [secondSheepDisplay, setSecondSheepDisplay] = useState<SecondSheep | null>(null);
   const [alienDisplay, setAlienDisplay] = useState<AlienDisplay | null>(null);
   const [ufoDisplay, setUfoDisplay] = useState<UfoDisplay | null>(null);
@@ -684,6 +685,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       if (elapsed > 3500) {
         bathtubPropRef.current = null;
         setBathtubProp(null);
+        setSplashHideSheep(false);
       }
     }
 
@@ -859,6 +861,8 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
         const btY = H - S_FH;
         bathtubPropRef.current = { x: btX, y: btY, frame: 3, startTs: ts, splash: true };
         setBathtubProp({ x: btX, y: btY, frame: 3 });
+        // Hide the sheep while the splash animation plays — it re-appears once the prop clears.
+        setSplashHideSheep(true);
       }
     }
 
@@ -1082,7 +1086,8 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
         )} />
       )}
 
-      {/* Main sheep — hidden during poo companion overlays to avoid bleed-through on transparent pixels.
+      {/* Main sheep — hidden during poo companion overlays to avoid bleed-through on transparent pixels,
+          and during bathtub splash so only the splash shows for that beat.
           Invisible drag-target div kept alive so the pet is still draggable during poo animations. */}
       <div
         onMouseDown={onMouseDown}
@@ -1091,7 +1096,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
           {
             cursor: 'grab',
             pointerEvents: 'auto',
-            visibility: pooDisplay ? 'hidden' : 'visible',
+            visibility: (pooDisplay || splashHideSheep) ? 'hidden' : 'visible',
             filter: stateRef.current === 'burn'
               ? 'drop-shadow(0 0 8px #ff6600) drop-shadow(0 0 16px #ff2200) brightness(1.2)'
               : 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',

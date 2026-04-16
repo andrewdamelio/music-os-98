@@ -21,23 +21,26 @@ const FELT = '#007000';
 const FELT_DARK = '#005800';
 
 // ── MS FreeCell LCG ───────────────────────────────────────────────────────────
+// Authentic MS FreeCell algorithm: pick rand() % remaining from a shrinking
+// array and replace with the last entry. Dealt 8-per-row (left to right).
 function dealGame(seed: number): Card[][] {
   let s = (seed >>> 0);
   const next = () => {
     s = ((Math.imul(214013, s) + 2531011) & 0x7fffffff) >>> 0;
     return (s >> 16) & 0x7fff;
   };
-  // Standard deck: suit = i%4, rank = floor(i/4)+1
-  const deck: Card[] = Array.from({ length: 52 }, (_, i) => ({
+  const cards: Card[] = Array.from({ length: 52 }, (_, i) => ({
     suit: (i % 4) as Suit,
     rank: Math.floor(i / 4) + 1,
   }));
-  for (let i = 51; i > 0; i--) {
-    const j = next() % (i + 1);
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
   const cols: Card[][] = Array.from({ length: 8 }, () => []);
-  for (let i = 0; i < 52; i++) cols[i % 8].push(deck[i]);
+  let wleft = 52;
+  for (let i = 0; i < 52; i++) {
+    const j = next() % wleft;
+    cols[i % 8].push(cards[j]);
+    cards[j] = cards[wleft - 1];
+    wleft--;
+  }
   return cols;
 }
 
