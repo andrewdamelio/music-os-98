@@ -92,6 +92,7 @@ export default function DrumMachine() {
     drumPattern, drumStepCount, drumSwing, currentPatternIdx,
     currentStep, isPlaying,
     toggleDrumStep, clearDrumPattern, loadDefaultPattern,
+    randomizeDrumPattern, copyDrumPattern, pasteDrumPattern,
     drumChannelGains, setDrumChannelGain,
     bpm, setBPM,
     setDrumSwing, setDrumStepCount, selectPattern,
@@ -177,6 +178,24 @@ export default function DrumMachine() {
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: 4 }}>
+          <button onClick={randomizeDrumPattern} title="Randomize this pattern" style={{
+            padding: '3px 10px', fontSize: 9, cursor: 'pointer', letterSpacing: 0.5,
+            background: 'linear-gradient(to bottom, #2a2a4a, #1a1a3a)',
+            color: '#99f', border: '1px solid #3a3a6a', borderRadius: 3,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
+          }}>🎲 RAND</button>
+          <button onClick={() => copyDrumPattern(currentPatternIdx)} title="Copy current pattern to clipboard" style={{
+            padding: '3px 8px', fontSize: 9, cursor: 'pointer', letterSpacing: 0.5,
+            background: 'linear-gradient(to bottom, #2a2a3a, #1a1a2a)',
+            color: '#aac', border: '1px solid #333344', borderRadius: 3,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
+          }}>COPY</button>
+          <button onClick={() => pasteDrumPattern(currentPatternIdx)} title="Paste clipboard into current pattern" style={{
+            padding: '3px 8px', fontSize: 9, cursor: 'pointer', letterSpacing: 0.5,
+            background: 'linear-gradient(to bottom, #2a2a3a, #1a1a2a)',
+            color: '#aac', border: '1px solid #333344', borderRadius: 3,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
+          }}>PASTE</button>
           <button onClick={loadDefaultPattern} style={{
             padding: '3px 10px', fontSize: 9, cursor: 'pointer', letterSpacing: 0.5,
             background: 'linear-gradient(to bottom, #2a3a2a, #1a2a1a)',

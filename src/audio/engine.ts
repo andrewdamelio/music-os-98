@@ -81,7 +81,7 @@ class AudioEngine {
     lfoTarget: 'filter',
     masterGain: 0.7,
   };
-  activeVoices: Map<string, { osc1: OscillatorNode; osc2: OscillatorNode; gainNode: GainNode; filter: BiquadFilterNode; lfo: OscillatorNode; lfoGain: GainNode }> = new Map();
+  activeVoices: Map<string, { osc1: OscillatorNode; osc2: OscillatorNode; osc2Mix: GainNode; gainNode: GainNode; filter: BiquadFilterNode; lfo: OscillatorNode; lfoGain: GainNode }> = new Map();
 
   // FX chain (global)
   fxParams: FXParams = {
@@ -145,6 +145,9 @@ class AudioEngine {
   // Swing (0 = straight, 0.5 = full swing)
   drumSwing = 0;
 
+  // Metronome — a sample-accurate click on quarter notes when playing
+  metronomeEnabled = false;
+
   // Transport
   bpm = 128;
   isPlaying = false;
@@ -165,6 +168,7 @@ class AudioEngine {
   mediaRecorder: MediaRecorder | null = null;
   recordedChunks: Blob[] = [];
   recordingStream: MediaStream | null = null;
+  recordingDest: MediaStreamAudioDestinationNode | null = null;
 
   // Schedule offset: use baseLatency (one audio frame) so notes always land in the next
   // processing block. Falls back to 0.005 on browsers that don't expose baseLatency yet.
@@ -765,7 +769,7 @@ class AudioEngine {
     osc2.start(now);
     lfo.start(now);
 
-    this.activeVoices.set(key, { osc1, osc2, gainNode: envGain, filter, lfo, lfoGain });
+    this.activeVoices.set(key, { osc1, osc2, osc2Mix: osc2Gain, gainNode: envGain, filter, lfo, lfoGain });
   }
 
   noteOff(noteNumber: number, channelIndex = 1) {
@@ -783,15 +787,18 @@ class AudioEngine {
     voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, now);
     voice.gainNode.gain.linearRampToValueAtTime(0, now + release);
 
-    // Stop/disconnect oscillators after the release tail finishes
+    // Schedule oscillator stop at the precise end of the release tail (Web Audio time),
+    // then disconnect nodes slightly after. setTimeout is only used for the disconnect
+    // (which doesn't need sample-accuracy).
+    const stopAt = now + release + 0.02;
+    try { voice.osc1.stop(stopAt); voice.osc2.stop(stopAt); voice.lfo.stop(stopAt); } catch {}
     setTimeout(() => {
       try {
-        voice.osc1.stop(); voice.osc2.stop(); voice.lfo.stop();
-        voice.osc1.disconnect(); voice.osc2.disconnect();
+        voice.osc1.disconnect(); voice.osc2.disconnect(); voice.osc2Mix.disconnect();
         voice.gainNode.disconnect(); voice.filter.disconnect();
         voice.lfo.disconnect(); voice.lfoGain.disconnect();
       } catch {}
-    }, (release + 0.05) * 1000);
+    }, (release + 0.1) * 1000);
   }
 
   updateSynthParam<K extends keyof SynthParams>(param: K, value: SynthParams[K]) {
@@ -901,10 +908,11 @@ class AudioEngine {
     if (this.schedulerTimerId !== null) clearTimeout(this.schedulerTimerId);
     this.schedulerTimerId = null;
     this.currentStep = -1;
-    // Stop all active voices
-    for (const [key, voice] of this.activeVoices) {
-      try { voice.osc1.stop(); voice.osc2.stop(); voice.lfo.stop(); } catch {}
-      this.activeVoices.delete(key);
+    // Stop all active voices cleanly. Copy keys before deleting to avoid mutating during iteration.
+    const keys = Array.from(this.activeVoices.keys());
+    for (const k of keys) {
+      const [chStr, noteStr] = k.split('-');
+      this.noteOff(parseInt(noteStr), parseInt(chStr));
     }
     this.notifyStep(-1);
   }
@@ -996,6 +1004,27 @@ class AudioEngine {
     osc2.stop(releaseStart + p.release + 0.02);
   }
 
+  private scheduleMetronomeClick(time: number, downbeat: boolean) {
+    if (!this.ctx || !this.masterGain) return;
+    const ctx = this.ctx;
+    // Route direct to destination so the click is never ducked by mixer mutes/solo/master fader
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = downbeat ? 1500 : 1000;
+    const g = ctx.createGain();
+    const peak = downbeat ? 0.5 : 0.35;
+    const dur = 0.06;
+    // Linear attack/decay — keeps the transient audible and sidesteps exponentialRamp corner cases
+    g.gain.setValueAtTime(0, time);
+    g.gain.linearRampToValueAtTime(peak, time + 0.002);
+    g.gain.linearRampToValueAtTime(0, time + dur);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start(time);
+    osc.stop(time + dur + 0.01);
+    osc.onended = () => { try { osc.disconnect(); g.disconnect(); } catch {} };
+  }
+
   private scheduleStep(step: number, time: number) {
     if (!this.ctx) return;
     const secondsPerBeat = 60 / this.bpm;
@@ -1010,12 +1039,20 @@ class AudioEngine {
       if (this.drumPattern[i]?.[step]) this.triggerDrum(ch, time);
     });
 
-    // Piano roll — independent beat counter that resets at pianoRollBeats * 4 steps
+    // Metronome click on every quarter note. Downbeat (step 0) is higher pitch.
+    if (this.metronomeEnabled && step % 4 === 0) {
+      this.scheduleMetronomeClick(time, step === 0);
+    }
+
+    // Piano roll — independent step counter that resets at pianoRollBeats * 4 steps.
+    // Match notes by rounding their beat position to the nearest 16th-note step (snap grid).
+    // This is exact — no float tolerance needed — because piano-roll notes are already
+    // snap-quantized when placed.
     if (this.pianoRollEnabled && this.pianoRollNotes.length > 0) {
-      const beatPos = this.pianoRollBeat / 4; // beats with 16th-note resolution
-      const tolerance = 0.13;
+      const currentStepAbs = this.pianoRollBeat;
       this.pianoRollNotes.forEach(note => {
-        if (Math.abs(note.beat - beatPos) < tolerance) {
+        const noteStep = Math.round(note.beat * 4);
+        if (noteStep === currentStepAbs) {
           const duration = note.duration * secondsPerBeat;
           this.noteOnScheduled(note.note, note.channel, time, duration);
         }
@@ -1061,9 +1098,12 @@ class AudioEngine {
 
   async startRecording() {
     if (!this.ctx || !this.masterAnalyser) return;
-    const dest = this.ctx.createMediaStreamDestination();
-    this.masterGain?.connect(dest);
-    this.mediaRecorder = new MediaRecorder(dest.stream);
+    // Clean up any prior recording dest that wasn't properly torn down
+    if (this.recordingDest) { try { this.recordingDest.disconnect(); } catch {} this.recordingDest = null; }
+    this.recordingDest = this.ctx.createMediaStreamDestination();
+    // Tap the post-analyser signal (end of chain) so the recording captures exactly what you hear
+    this.masterAnalyser.connect(this.recordingDest);
+    this.mediaRecorder = new MediaRecorder(this.recordingDest.stream);
     this.recordedChunks = [];
     this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) this.recordedChunks.push(e.data); };
     this.mediaRecorder.start();
@@ -1072,11 +1112,19 @@ class AudioEngine {
   stopRecording(): Promise<Blob | null> {
     return new Promise(resolve => {
       if (!this.mediaRecorder) { resolve(null); return; }
-      this.mediaRecorder.onstop = () => {
+      const rec = this.mediaRecorder;
+      const dest = this.recordingDest;
+      rec.onstop = () => {
         const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+        // Disconnect the tap and stop the stream so the node can be GC'd
+        try { dest?.disconnect(); } catch {}
+        try { dest?.stream.getTracks().forEach(t => t.stop()); } catch {}
+        if (this.recordingDest === dest) this.recordingDest = null;
+        if (this.mediaRecorder === rec) this.mediaRecorder = null;
+        this.recordedChunks = [];
         resolve(blob);
       };
-      this.mediaRecorder.stop();
+      rec.stop();
     });
   }
 

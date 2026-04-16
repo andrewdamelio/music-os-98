@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export default function TransportBar() {
   const { isPlaying, bpm, currentStep, loopEnabled, isRecording, projectName, drumStepCount,
+    metronomeEnabled, toggleMetronome,
     play, stop, setBPM, toggleLoop, toggleRecord, saveProject, loadProjectFromJSON, setProjectName } = useOSStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingBpm, setEditingBpm] = useState(false);
@@ -133,6 +134,16 @@ export default function TransportBar() {
         style={{ fontSize: 13 }}
       >
         🔁
+      </button>
+
+      {/* Metronome */}
+      <button
+        className={`transport-btn${metronomeEnabled ? ' active' : ''}`}
+        onClick={toggleMetronome}
+        title="Metronome (quarter-note click)"
+        style={{ fontSize: 13 }}
+      >
+        🎯
       </button>
 
       <div className="taskbar-separator" style={{ height: 20 }} />

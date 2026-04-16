@@ -46,6 +46,7 @@ import SkiFree from '../apps/SkiFree';
 import Compressor from '../apps/Compressor';
 import EQ from '../apps/EQ';
 import MilkDrop from '../apps/MilkDrop';
+import FreeCell from '../apps/FreeCell';
 import scmpoo103 from '../assets/scmpoo103.png';
 import DesktopPet from './DesktopPet';
 import SubSeven from '../apps/SubSeven';
@@ -112,6 +113,7 @@ const APP_MAP: Record<string, React.ComponentType> = {
   Compressor,
   EQ,
   MilkDrop,
+  FreeCell,
   SubSeven,
   ControlPanel,
   ICQ,
@@ -134,6 +136,7 @@ const DESKTOP_ICONS = [
   { id: 'pad-machine', label: 'Pad Machine', icon: '🎶' },
   { id: 'ski-free', label: 'SkiFree', icon: '⛷️' },
   { id: 'screen-mate', label: 'Screen Mate Poo', icon: '🐑', iconImg: { src: scmpoo103, frame: 0 } },
+  { id: 'freecell', label: 'FreeCell', icon: '🃏' },
   { id: 'milkdrop', label: 'MilkDrop Viz', icon: '🌊' },
   { id: 'sub-seven', label: 'SubSeven', icon: '💀', iconSvg: true },
   { id: 'napster', label: 'Napster', icon: '🐱', iconSvg: true },
@@ -168,6 +171,19 @@ export default function Desktop() {
       if (e.code === 'Space') {
         e.preventDefault();
         if (isPlaying) stop(); else play();
+        return;
+      }
+      // Undo / redo — Cmd+Z on Mac, Ctrl+Z on Windows. Shift adds redo.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        const { undo, redo } = useOSStore.getState();
+        if (e.shiftKey) redo(); else undo();
+        return;
+      }
+      // Ctrl+Y also redoes on Windows convention
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        useOSStore.getState().redo();
       }
     };
     window.addEventListener('keydown', handler);

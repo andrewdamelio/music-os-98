@@ -82,6 +82,7 @@ export const APPS: AppDef[] = [
   { id: 'tempo-calc', title: 'Tempo Calc', icon: '🔢', component: 'TempoCalc', defaultSize: { w: 340, h: 400 }, singleton: true },
   { id: 'help', title: 'Help & Manual', icon: '❓', component: 'Help', defaultSize: { w: 620, h: 520 }, singleton: true },
   { id: 'oscilloscope', title: 'Oscilloscope', icon: '📊', component: 'Oscilloscope', defaultSize: { w: 580, h: 240 }, singleton: true },
+  { id: 'freecell', title: 'FreeCell', icon: '🃏', component: 'FreeCell', defaultSize: { w: 680, h: 520 }, singleton: true },
   { id: 'milkdrop', title: 'MilkDrop Viz', icon: '🌊', component: 'MilkDrop', defaultSize: { w: 520, h: 420 }, singleton: true },
   { id: 'compressor', title: 'Compressor', icon: '🔊', component: 'Compressor', defaultSize: { w: 560, h: 320 }, singleton: true },
   { id: 'eq', title: 'Parametric EQ', icon: '🎛️', component: 'EQ', defaultSize: { w: 580, h: 420 }, singleton: true },
@@ -96,6 +97,32 @@ export const APPS: AppDef[] = [
 
 let zCounter = 100;
 let stepUnsub: (() => void) | null = null;
+let drumClipboard: boolean[][] | null = null;
+
+// Undo/redo: snapshots of drum patterns + piano notes only (audio state / transport is not history).
+// Coalesce rapid mutations (e.g. piano-roll drag) into a single snapshot within a short window.
+type HistorySnapshot = { drumPatterns: boolean[][][]; pianoNotes: PianoNote[] };
+const HISTORY_LIMIT = 50;
+const COALESCE_MS = 400;
+const undoStack: HistorySnapshot[] = [];
+const redoStack: HistorySnapshot[] = [];
+let lastHistoryPush = 0;
+function cloneSnapshot(s: { drumPatterns: boolean[][][]; pianoNotes: PianoNote[] }): HistorySnapshot {
+  return {
+    drumPatterns: s.drumPatterns.map(p => p.map(row => [...row])),
+    pianoNotes: s.pianoNotes.map(n => ({ ...n })),
+  };
+}
+// Push the current drum+piano state onto the undo stack, clearing redo.
+// Coalesces rapid successive edits (e.g. a piano-roll drag) into one snapshot.
+function pushHistory(state: { drumPatterns: boolean[][][]; pianoNotes: PianoNote[] }) {
+  const now = Date.now();
+  if (now - lastHistoryPush < COALESCE_MS) return;
+  lastHistoryPush = now;
+  undoStack.push(cloneSnapshot(state));
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
 
 interface OSStore {
   // Boot
@@ -130,12 +157,14 @@ interface OSStore {
   loopEnabled: boolean;
   isRecording: boolean;
   projectName: string;
+  metronomeEnabled: boolean;
   play: () => void;
   stop: () => void;
   setBPM: (bpm: number) => void;
   setCurrentStep: (step: number) => void;
   toggleLoop: () => void;
   toggleRecord: () => void;
+  toggleMetronome: () => void;
   setProjectName: (name: string) => void;
   saveProject: () => void;
   loadProjectFromJSON: (json: string) => void;
@@ -149,6 +178,13 @@ interface OSStore {
   toggleDrumStep: (channel: number, step: number) => void;
   clearDrumPattern: () => void;
   loadDefaultPattern: () => void;
+  randomizeDrumPattern: () => void;
+  copyDrumPattern: (fromIdx: number) => void;
+  pasteDrumPattern: (toIdx: number) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
   setDrumSwing: (swing: number) => void;
   setDrumStepCount: (n: number) => void;
   selectPattern: (idx: number) => void;
@@ -318,6 +354,7 @@ export const useOSStore = create<OSStore>((set, get) => ({
   loopEnabled: true,
   isRecording: false,
   projectName: 'Untitled Project',
+  metronomeEnabled: false,
 
   play: () => {
     audioEngine.init();
@@ -343,6 +380,11 @@ export const useOSStore = create<OSStore>((set, get) => ({
 
   setCurrentStep: (step) => set({ currentStep: step }),
   toggleLoop: () => set(s => ({ loopEnabled: !s.loopEnabled })),
+  toggleMetronome: () => {
+    const next = !get().metronomeEnabled;
+    audioEngine.metronomeEnabled = next;
+    set({ metronomeEnabled: next });
+  },
 
   toggleRecord: () => {
     const { isRecording } = get();
@@ -357,7 +399,11 @@ export const useOSStore = create<OSStore>((set, get) => ({
           const a = document.createElement('a');
           a.href = url;
           a.download = `${get().projectName.replace(/\s+/g, '_')}_recording.webm`;
+          document.body.appendChild(a);
           a.click();
+          document.body.removeChild(a);
+          // Give the browser a tick to start the download before revoking
+          setTimeout(() => URL.revokeObjectURL(url), 1500);
         }
       });
       set({ isRecording: false });
@@ -554,7 +600,9 @@ export const useOSStore = create<OSStore>((set, get) => ({
   drumPattern: Array.from({ length: 8 }, () => Array(32).fill(false)),
 
   toggleDrumStep: (channel, step) => {
-    const { drumPatterns, currentPatternIdx } = get();
+    const state = get();
+    pushHistory(state);
+    const { drumPatterns, currentPatternIdx } = state;
     const newPatterns = drumPatterns.map((pat, pi) =>
       pi === currentPatternIdx
         ? pat.map((row, i) => i === channel ? row.map((v, j) => j === step ? !v : v) : row)
@@ -566,7 +614,8 @@ export const useOSStore = create<OSStore>((set, get) => ({
   },
 
   clearDrumPattern: () => {
-    const { drumPatterns, currentPatternIdx, drumStepCount } = get();
+    pushHistory(get());
+    const { drumPatterns, currentPatternIdx } = get();
     const empty = Array.from({ length: 8 }, () => Array(32).fill(false));
     const newPatterns = drumPatterns.map((pat, pi) => pi === currentPatternIdx ? empty : pat);
     set({ drumPatterns: newPatterns, drumPattern: empty });
@@ -574,6 +623,7 @@ export const useOSStore = create<OSStore>((set, get) => ({
   },
 
   loadDefaultPattern: () => {
+    pushHistory(get());
     audioEngine.init();
     audioEngine.loadDefaultPattern();
     const { drumPatterns, currentPatternIdx } = get();
@@ -587,6 +637,89 @@ export const useOSStore = create<OSStore>((set, get) => ({
     set({ drumPatterns: newPatterns, drumPattern: loaded });
     audioEngine.drumPattern = loaded;
   },
+
+  randomizeDrumPattern: () => {
+    pushHistory(get());
+    const { drumPatterns, currentPatternIdx, drumStepCount } = get();
+    // Density per channel tuned so patterns are musical, not just noise.
+    // kick / snare / hihat / openhat / clap / tom1 / tom2 / cymbal
+    const densities = [0.35, 0.22, 0.55, 0.08, 0.15, 0.08, 0.08, 0.05];
+    const randomized: boolean[][] = Array.from({ length: 8 }, (_, ch) =>
+      Array.from({ length: 32 }, (_, step) => {
+        if (step >= drumStepCount) return false;
+        // Favor on-grid hits (every 4th step) slightly
+        const onBeatBoost = step % 4 === 0 ? 1.4 : 1;
+        return Math.random() < densities[ch]! * onBeatBoost;
+      }),
+    );
+    // Guarantee a kick on step 0 for groove
+    randomized[0]![0] = true;
+    const newPatterns = drumPatterns.map((pat, pi) => pi === currentPatternIdx ? randomized : pat);
+    set({ drumPatterns: newPatterns, drumPattern: randomized });
+    audioEngine.drumPattern = randomized.map(row => [...row]);
+  },
+
+  copyDrumPattern: (fromIdx) => {
+    const { drumPatterns } = get();
+    const src = drumPatterns[fromIdx];
+    if (!src) return;
+    drumClipboard = src.map(row => [...row]);
+  },
+
+  pasteDrumPattern: (toIdx) => {
+    if (!drumClipboard) return;
+    pushHistory(get());
+    const { drumPatterns, currentPatternIdx } = get();
+    const copied = drumClipboard.map(row => [...row]);
+    const newPatterns = drumPatterns.map((pat, pi) => pi === toIdx ? copied : pat);
+    set({
+      drumPatterns: newPatterns,
+      drumPattern: toIdx === currentPatternIdx ? copied : drumPatterns[currentPatternIdx]!,
+    });
+    if (toIdx === currentPatternIdx) {
+      audioEngine.drumPattern = copied.map(row => [...row]);
+    }
+  },
+
+  undo: () => {
+    const prev = undoStack.pop();
+    if (!prev) return;
+    const cur = get();
+    redoStack.push(cloneSnapshot(cur));
+    // Reset coalesce window so the next edit creates a new history entry
+    lastHistoryPush = 0;
+    const currentPattern = prev.drumPatterns[cur.currentPatternIdx]!;
+    set({
+      drumPatterns: prev.drumPatterns.map(p => p.map(row => [...row])),
+      drumPattern: currentPattern.map(row => [...row]),
+      pianoNotes: prev.pianoNotes.map(n => ({ ...n })),
+    });
+    audioEngine.drumPattern = currentPattern.map(row => [...row]);
+    audioEngine.pianoRollNotes = prev.pianoNotes.map(n => ({
+      note: n.note, beat: n.beat, duration: n.duration, channel: n.channel,
+    }));
+  },
+
+  redo: () => {
+    const next = redoStack.pop();
+    if (!next) return;
+    const cur = get();
+    undoStack.push(cloneSnapshot(cur));
+    lastHistoryPush = 0;
+    const currentPattern = next.drumPatterns[cur.currentPatternIdx]!;
+    set({
+      drumPatterns: next.drumPatterns.map(p => p.map(row => [...row])),
+      drumPattern: currentPattern.map(row => [...row]),
+      pianoNotes: next.pianoNotes.map(n => ({ ...n })),
+    });
+    audioEngine.drumPattern = currentPattern.map(row => [...row]);
+    audioEngine.pianoRollNotes = next.pianoNotes.map(n => ({
+      note: n.note, beat: n.beat, duration: n.duration, channel: n.channel,
+    }));
+  },
+
+  canUndo: () => undoStack.length > 0,
+  canRedo: () => redoStack.length > 0,
 
   setDrumSwing: (swing) => {
     set({ drumSwing: swing });
@@ -629,6 +762,7 @@ export const useOSStore = create<OSStore>((set, get) => ({
   pianoRollEnabled: false,
   pianoRollBeats: 4,
   addPianoNote: (note) => {
+    pushHistory(get());
     set(s => {
       const notes = [...s.pianoNotes, note];
       audioEngine.pianoRollNotes = notes.map(n => ({
@@ -638,6 +772,7 @@ export const useOSStore = create<OSStore>((set, get) => ({
     });
   },
   removePianoNote: (id) => {
+    pushHistory(get());
     set(s => {
       const notes = s.pianoNotes.filter(n => n.id !== id);
       audioEngine.pianoRollNotes = notes.map(n => ({
@@ -651,6 +786,7 @@ export const useOSStore = create<OSStore>((set, get) => ({
     set({ pianoRollEnabled: enabled });
   },
   setPianoNotes: (notes) => {
+    pushHistory(get());
     audioEngine.pianoRollNotes = notes.map(n => ({
       note: n.note, beat: n.beat, duration: n.duration, channel: n.channel,
     }));

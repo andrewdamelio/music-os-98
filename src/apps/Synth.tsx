@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useOSStore } from '../store';
 import { audioEngine } from '../audio/engine';
 import type { SynthParams } from '../audio/engine';
+import { midiBridge } from '../audio/midi';
 
 // ── Factory Patches ──────────────────────────────────────────────────────────
 interface Patch { name: string; params: SynthParams; factory?: boolean; }
@@ -389,6 +390,8 @@ export default function Synth() {
   const { synthParams, updateSynthParam } = useOSStore();
   const [pressedKeys, setPressedKeys] = useState<Set<number>>(new Set());
   const [octaveShift, setOctaveShift] = useState(0);
+  const [midiOn, setMidiOn] = useState(false);
+  const [midiDevices, setMidiDevices] = useState(0);
 
   const loadPatch = useCallback((p: Patch) => {
     const keys = Object.keys(p.params) as (keyof SynthParams)[];
@@ -494,12 +497,55 @@ export default function Synth() {
     };
   }, [octaveShift, channelIndex]);
 
+  // MIDI: mirror external controller note events into pressedKeys so the on-screen
+  // keyboard reflects hardware input. The bridge itself handles audioEngine note on/off.
+  useEffect(() => {
+    const unsub = midiBridge.onMessage(msg => {
+      if (msg.type === 'on') setPressedKeys(prev => new Set([...prev, msg.note]));
+      else setPressedKeys(prev => { const s = new Set(prev); s.delete(msg.note); return s; });
+    });
+    return unsub;
+  }, []);
+
+  const toggleMidi = useCallback(async () => {
+    if (midiOn) {
+      midiBridge.disable();
+      setMidiOn(false);
+      setMidiDevices(0);
+    } else {
+      // Ensure audio context is live so the very first MIDI note plays immediately
+      audioEngine.ensureRunning(() => {});
+      const ok = await midiBridge.enable();
+      if (ok) {
+        setMidiOn(true);
+        setMidiDevices(midiBridge.connectedCount);
+      } else {
+        alert('Web MIDI not supported in this browser (try Chrome/Edge) or permission denied.');
+      }
+    }
+  }, [midiOn]);
+
   const oscTypes: OscillatorType[] = ['sine', 'sawtooth', 'square', 'triangle'];
 
   return (
     <div className="plugin-bg" style={{ padding: 12 }}>
-      <div style={{ color: 'var(--px-cyan)', fontFamily: "'VT323', monospace", fontSize: 22, marginBottom: 8 }}>
-        🎹 SYNTHSTATION — SubTrax Engine
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ color: 'var(--px-cyan)', fontFamily: "'VT323', monospace", fontSize: 22 }}>
+          🎹 SYNTHSTATION — SubTrax Engine
+        </div>
+        <button
+          onClick={toggleMidi}
+          title={midiBridge.isSupported() ? 'Toggle Web MIDI input' : 'Web MIDI not supported in this browser'}
+          style={{
+            padding: '3px 10px', fontSize: 10, cursor: 'pointer',
+            background: midiOn ? 'rgba(57,255,20,0.18)' : '#0d0d1f',
+            color: midiOn ? 'var(--px-green)' : 'var(--px-text-dim)',
+            border: `1px solid ${midiOn ? 'var(--px-green)' : 'var(--px-border)'}`,
+            borderRadius: 3, fontFamily: 'monospace',
+          }}
+        >
+          {midiOn ? `● MIDI ON · ${midiDevices} dev` : '○ MIDI OFF'}
+        </button>
       </div>
 
       <PatchBrowser onLoad={loadPatch} />

@@ -279,6 +279,32 @@ Delay time table shows exact millisecond values for all note
 divisions at the current BPM — useful for hardware delays.`,
   },
   {
+    title: '🃏 FreeCell',
+    content: `Classic Windows 95 FreeCell solitaire.
+
+Rules:
+• Move all 52 cards to the 4 foundation piles (Ace → King by suit)
+• Build foundations up in suit (A, 2, 3 ... K)
+• Build tableau columns down in alternating colors
+• Use the 4 free cells as temporary holding spots
+• Any card can move to an empty column
+
+Controls:
+• Click a card to select it (highlighted yellow)
+• Click the destination to place it
+• Click same card again or press Esc to deselect
+• Ctrl+Z — Undo last move
+
+Supermove:
+You can move a sequence of N cards if you have enough free cells and empty columns: (free cells + 1) × 2^(empty columns) = max movable.
+
+Game Numbers:
+Classic MS FreeCell games 1–32000. Game #11982 is the only known unsolvable deal. Type a number in the Game # box and press Enter.
+
+Auto-move:
+Cards safely eligible for foundation are moved automatically after each turn.`,
+  },
+  {
     title: '⛷️ SkiFree',
     content: `A remake of the classic Windows 3.x SkiFree game.
 

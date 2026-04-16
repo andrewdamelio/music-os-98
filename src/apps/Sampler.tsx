@@ -103,11 +103,17 @@ export default function Sampler() {
       g.connect(audioEngine.mixerInputs[2] || audioEngine.masterGain!);
       source.connect(g);
 
+      source.onended = () => {
+        try { source.disconnect(); g.disconnect(); } catch {}
+      };
+
       const dur = sample.buffer.duration;
       const startTime = sample.start * dur;
       const endTime = sample.end * dur;
       source.start(ctx.currentTime, startTime, endTime - startTime);
-      if (!sample.loop) setTimeout(() => { try { source.stop(); } catch {} }, (endTime - startTime) * 1000 + 100);
+      if (!sample.loop) {
+        try { source.stop(ctx.currentTime + (endTime - startTime)); } catch {}
+      }
     });
   };
 

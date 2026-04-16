@@ -37,6 +37,14 @@ function idbPatchDuration(db: IDBDatabase, id: string, duration: number): void {
   const req = store.get(id);
   req.onsuccess = () => { if (req.result) { req.result.duration = duration; store.put(req.result); } };
 }
+function idbDelete(db: IDBDatabase, id: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 
 // ── Napster Cat Icon ──────────────────────────────────────────────────────────
 export function NapsterCatIcon({ size = 32 }: { size?: number }) {
@@ -355,6 +363,43 @@ export default function Napster() {
     e.target.value = '';
   }, [spawnFakeDownload]);
 
+  // Remove a file from the library: stops playback if it's the current track,
+  // revokes its blob URL, clears any queued fake downloads, and deletes from IndexedDB.
+  const deleteFile = useCallback((file: NapFile) => {
+    // Stop playback if this file is currently loaded
+    if (selectedFile?.id === file.id) {
+      const wa = waRef.current;
+      if (wa?.source) { try { wa.source.stop(); } catch {} }
+      waRef.current = null;
+      setSelectedFile(null);
+      setPlaying(false);
+      setCurrentTime(0);
+      setPlayError(null);
+      if (timePollerRef.current) { clearInterval(timePollerRef.current); timePollerRef.current = null; }
+    }
+
+    // Free the blob URL
+    try { URL.revokeObjectURL(file.url); } catch {}
+    blobUrlsRef.current = blobUrlsRef.current.filter(u => u !== file.url);
+
+    // Drop any in-flight fake transfers referencing this file
+    setDownloads(prev => prev.filter(d => d.fileId !== file.id));
+
+    // Remove from UI list
+    setFiles(prev => prev.filter(f => f.id !== file.id));
+
+    // Persist the deletion
+    if (dbRef.current) {
+      idbDelete(dbRef.current, file.id).catch(err => console.warn('[Napster] IDB delete failed:', err));
+    }
+  }, [selectedFile]);
+
+  const confirmDeleteFile = useCallback((file: NapFile) => {
+    if (window.confirm(`Remove "${file.name}" from your library?\n\nThis deletes the stored file and cannot be undone.`)) {
+      deleteFile(file);
+    }
+  }, [deleteFile]);
+
   // ── Playback (Web Audio API — works with video/webm containers) ──────────
   const stopPoller = useCallback(() => {
     if (timePollerRef.current) { clearInterval(timePollerRef.current); timePollerRef.current = null; }
@@ -645,6 +690,14 @@ export default function Napster() {
               <button style={btn98} onClick={() => fileInputRef.current?.click()}>
                 📂 Add Files...
               </button>
+              <button
+                style={{ ...btn98, opacity: selectedFile ? 1 : 0.5, cursor: selectedFile ? 'pointer' : 'not-allowed' }}
+                disabled={!selectedFile}
+                onClick={() => selectedFile && confirmDeleteFile(selectedFile)}
+                title="Remove selected file from library"
+              >
+                🗑 Remove
+              </button>
               <span style={{ fontSize: 10, color: N.dim }}>Load .webm recordings from Tape Deck to share them</span>
               <div style={{ flex: 1 }} />
               {selectedFile && (
@@ -667,16 +720,17 @@ export default function Napster() {
               <div style={{ flex: 1, overflow: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                   <colgroup>
-                    <col style={{ width: '38%' }} />
-                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '34%' }} />
                     <col style={{ width: '12%' }} />
-                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '10%' }} />
                     <col style={{ width: '24%' }} />
+                    <col style={{ width: '9%' }} />
                   </colgroup>
                   <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                     <tr>
-                      {['Name', 'Size', 'Duration', 'Format', 'Status'].map(h => (
-                        <th key={h} style={colHdr}>{h}</th>
+                      {['Name', 'Size', 'Duration', 'Format', 'Status', ''].map((h, idx) => (
+                        <th key={idx} style={colHdr}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -703,7 +757,7 @@ export default function Napster() {
                           <td style={{ padding: '1px 6px', fontSize: 11, borderRight: `1px solid #e0e0e0` }}>{formatBytes(f.size)}</td>
                           <td style={{ padding: '1px 6px', fontSize: 11, borderRight: `1px solid #e0e0e0` }}>{formatDuration(f.duration)}</td>
                           <td style={{ padding: '1px 6px', fontSize: 11, borderRight: `1px solid #e0e0e0`, color: isSelected ? N.textSel : '#666' }}>WebM</td>
-                          <td style={{ padding: '1px 6px', fontSize: 10 }}>
+                          <td style={{ padding: '1px 6px', fontSize: 10, borderRight: `1px solid #e0e0e0` }}>
                             {activeForFile > 0 ? (
                               <span style={{ color: isSelected ? '#88ff88' : '#006600' }}>
                                 ↑ {activeForFile} uploading, {completedForFile} done
@@ -715,6 +769,25 @@ export default function Napster() {
                             ) : (
                               <span style={{ color: isSelected ? '#aaaaaa' : N.dim }}>Shared</span>
                             )}
+                          </td>
+                          <td style={{ padding: '1px 4px', fontSize: 10, textAlign: 'center' }}>
+                            <button
+                              onClick={e => { e.stopPropagation(); confirmDeleteFile(f); }}
+                              title={`Remove ${f.name}`}
+                              style={{
+                                padding: '0 6px', fontSize: 10, lineHeight: '14px',
+                                background: isSelected ? 'transparent' : N.btnFace,
+                                color: isSelected ? '#ffcccc' : '#880000',
+                                border: `1px solid`,
+                                borderColor: isSelected
+                                  ? '#5577cc #000033 #000033 #5577cc'
+                                  : '#ffffff #808080 #808080 #ffffff',
+                                cursor: 'pointer',
+                                fontFamily: 'Tahoma, Arial, sans-serif',
+                              }}
+                            >
+                              ✕
+                            </button>
                           </td>
                         </tr>
                       );

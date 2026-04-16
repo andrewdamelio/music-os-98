@@ -66,7 +66,6 @@ export default function PianoRoll() {
   const BEATS = pianoRollBeats;
   const [snapTo, setSnapTo] = useState(0.25);
   const [noteDuration, setNoteDuration] = useState(0.25);
-  const selectedTool = 'draw'; // draw mode toggles: click empty → add, click note → remove
   const [zoom, setZoom] = useState(1);
   const [hoveredKey, setHoveredKey] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -78,30 +77,75 @@ export default function PianoRoll() {
 
   const playheadX = isPlaying ? ((audioEngine.pianoRollDisplayBeat / (BEATS * 4)) * totalW) : -1;
 
-  const handleGridClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!gridRef.current) return;
-    const rect = gridRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left + gridRef.current.scrollLeft;
-    const y = e.clientY - rect.top + gridRef.current.scrollTop;
-    const beat = x / beatW;
-    const snappedBeat = Math.round(beat / snapTo) * snapTo;
+  // Drag state — refs so move handler doesn't cause re-renders
+  const dragModeRef = useRef<'draw' | 'erase' | null>(null);
+  const dragTouchedRef = useRef<Set<string>>(new Set());
+
+  // Resolve a client point into grid coords (beat + midi).
+  // Returns null if outside the playable range.
+  const pointToCell = useCallback((clientX: number, clientY: number) => {
+    const grid = gridRef.current;
+    if (!grid) return null;
+    const rect = grid.getBoundingClientRect();
+    const x = clientX - rect.left + grid.scrollLeft;
+    const y = clientY - rect.top + grid.scrollTop;
+    if (x < 0 || y < 0) return null;
+    const snappedBeat = Math.max(0, Math.round((x / beatW) / snapTo) * snapTo);
     const noteFromTop = Math.floor(y / NOTE_HEIGHT);
     const midi = START_NOTE + NUM_NOTES - 1 - noteFromTop;
-    if (midi < START_NOTE || midi >= START_NOTE + NUM_NOTES) return;
+    if (midi < START_NOTE || midi >= START_NOTE + NUM_NOTES) return null;
+    return { midi, snappedBeat };
+  }, [beatW, snapTo]);
 
-    if (selectedTool === 'draw') {
-      const overlapping = pianoNotes.find(n =>
-        n.note === midi && n.beat <= snappedBeat && n.beat + n.duration > snappedBeat
-      );
-      if (overlapping) { removePianoNote(overlapping.id); return; }
-      addPianoNote({ id: `note-${Date.now()}-${Math.random()}`, note: midi, beat: snappedBeat, duration: noteDuration, channel: 1 });
-    } else {
-      const target = pianoNotes.find(n =>
-        n.note === midi && n.beat <= snappedBeat && n.beat + n.duration > snappedBeat
-      );
-      if (target) removePianoNote(target.id);
+  const applyAt = useCallback((midi: number, snappedBeat: number) => {
+    const key = `${midi}:${snappedBeat.toFixed(4)}`;
+    if (dragTouchedRef.current.has(key)) return;
+    dragTouchedRef.current.add(key);
+
+    // Read fresh notes each time so drag sees our own additions/removals
+    const notes = useOSStore.getState().pianoNotes;
+    const overlapping = notes.find(n =>
+      n.note === midi && n.beat <= snappedBeat && n.beat + n.duration > snappedBeat
+    );
+    if (dragModeRef.current === 'erase') {
+      if (overlapping) removePianoNote(overlapping.id);
+    } else if (dragModeRef.current === 'draw') {
+      if (!overlapping) {
+        addPianoNote({
+          id: `note-${Date.now()}-${Math.random()}`,
+          note: midi, beat: snappedBeat, duration: noteDuration, channel: 1,
+        });
+      }
     }
-  }, [beatW, snapTo, pianoNotes, addPianoNote, removePianoNote, selectedTool, noteDuration]);
+  }, [addPianoNote, removePianoNote, noteDuration]);
+
+  const handleGridMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const cell = pointToCell(e.clientX, e.clientY);
+    if (!cell) return;
+
+    // Decide mode from the starting cell: note present → erase, empty → draw
+    const notes = useOSStore.getState().pianoNotes;
+    const overlapping = notes.find(n =>
+      n.note === cell.midi && n.beat <= cell.snappedBeat && n.beat + n.duration > cell.snappedBeat
+    );
+    dragModeRef.current = overlapping ? 'erase' : 'draw';
+    dragTouchedRef.current = new Set();
+    applyAt(cell.midi, cell.snappedBeat);
+
+    const onMove = (me: MouseEvent) => {
+      const c = pointToCell(me.clientX, me.clientY);
+      if (c) applyAt(c.midi, c.snappedBeat);
+    };
+    const onUp = () => {
+      dragModeRef.current = null;
+      dragTouchedRef.current.clear();
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [pointToCell, applyAt]);
 
   // Sync scroll between piano keys and grid
   const onGridScroll = useCallback(() => {
@@ -307,7 +351,7 @@ export default function PianoRoll() {
           <div ref={gridRef} onScroll={onGridScroll} style={{
             flex: 1, overflow: 'auto', position: 'relative',
             cursor: 'crosshair',
-          }} onClick={handleGridClick}>
+          }} onMouseDown={handleGridMouseDown}>
             <div style={{ width: totalW, height: totalH, position: 'relative' }}>
 
               {/* Row backgrounds */}
@@ -362,11 +406,8 @@ export default function PianoRoll() {
                     cursor: 'pointer',
                     overflow: 'hidden',
                     zIndex: 3,
+                    pointerEvents: 'none',
                   }}
-                    onClick={e => {
-                      e.stopPropagation();
-                      removePianoNote(note.id);
-                    }}
                     title={noteName(note.note)}
                   >
                     {/* Note inner shine */}
@@ -417,7 +458,7 @@ export default function PianoRoll() {
         <span style={{ color: '#445' }}>SNAP <span style={{ color: '#556' }}>{snapTo === 0.125 ? '1/32' : snapTo === 0.25 ? '1/16' : snapTo === 0.5 ? '1/8' : '1/4'}</span></span>
         <span style={{ color: '#445' }}>LEN <span style={{ color: '#556' }}>{noteDuration === 0.125 ? '1/32' : noteDuration === 0.25 ? '1/16' : noteDuration === 0.5 ? '1/8' : noteDuration === 1 ? '1/4' : '1/2'}</span></span>
         <div style={{ flex: 1 }} />
-        <span style={{ color: '#334' }}>Click empty cell to draw · Click note again to delete · Piano keys playable</span>
+        <span style={{ color: '#334' }}>Drag empty cells to draw · Drag notes to erase · Piano keys playable</span>
         <span style={{
           color: pianoRollEnabled ? '#39ff14' : '#334',
           textShadow: pianoRollEnabled ? '0 0 6px #39ff1466' : 'none',

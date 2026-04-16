@@ -1,60 +1,67 @@
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { useOSStore } from '../store';
 import { audioEngine } from '../audio/engine';
 
 // ── VU Meter ──────────────────────────────────────────────────────────────────
+// Renders to a canvas and drives all updates via refs — never re-renders through React.
+// This alone saves ~300 React re-renders per frame with 10 meters on screen.
+const VU_SEGMENTS = 16;
+const VU_HEIGHT = 112;
+const VU_WIDTH = 20; // two 9px bars + 2px gap
 function VUMeter({ channelIdx, color }: { channelIdx: number; color: string }) {
-  const [level, setLevel] = useState(0);
-  const peakRef = useRef(0);
-  const peakHoldRef = useRef(0);
-  const animRef = useRef<number>(0);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number>(0);
 
   useEffect(() => {
-    const tick = () => {
-      animRef.current = requestAnimationFrame(tick);
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const dpr = window.devicePixelRatio || 1;
+    cvs.width = VU_WIDTH * dpr;
+    cvs.height = VU_HEIGHT * dpr;
+    const ctx = cvs.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    let peak = 0;
+    let peakHold = 0;
+    const segH = (VU_HEIGHT - 4) / VU_SEGMENTS;
+
+    const draw = () => {
+      rafRef.current = requestAnimationFrame(draw);
       const raw = audioEngine.getChannelLevel(channelIdx);
-      const scaled = Math.min(1, raw * 8);
-      setLevel(scaled);
-      if (scaled > peakRef.current) {
-        peakRef.current = scaled;
-        peakHoldRef.current = 70;
-      } else {
-        peakHoldRef.current--;
-        if (peakHoldRef.current <= 0) peakRef.current = Math.max(0, peakRef.current - 0.012);
+      const level = Math.min(1, raw * 8);
+      if (level > peak) { peak = level; peakHold = 70; }
+      else { peakHold--; if (peakHold <= 0) peak = Math.max(0, peak - 0.012); }
+
+      ctx.clearRect(0, 0, VU_WIDTH, VU_HEIGHT);
+      for (let barX of [0, 11]) {
+        // Track background
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(barX, 0, 9, VU_HEIGHT);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(barX + 1, 2, 7, VU_HEIGHT - 4);
+
+        for (let i = 0; i < VU_SEGMENTS; i++) {
+          const segLevel = 1 - (i + 1) / VU_SEGMENTS;
+          const lit = level > segLevel;
+          const isPeak = barX === 0 && Math.abs(peak - (1 - i / VU_SEGMENTS)) < 1.2 / VU_SEGMENTS;
+          if (!lit && !isPeak) continue;
+          const segColor = i <= 1 ? '#ff3333' : i <= 3 ? '#ff9900' : color;
+          ctx.fillStyle = lit ? segColor : segColor + 'cc';
+          ctx.fillRect(barX + 1, 2 + i * segH, 7, Math.max(1, segH - 1));
+        }
       }
     };
-    animRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [channelIdx]);
 
-  const segments = 16;
+    rafRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [channelIdx, color]);
+
   return (
-    <div style={{ display: 'flex', gap: 2 }}>
-      {[0, 1].map(col => (
-        <div key={col} style={{
-          display: 'flex', flexDirection: 'column', gap: 1,
-          width: 9, height: 112,
-          background: 'rgba(0,0,0,0.7)',
-          borderRadius: 3, padding: '2px 1px',
-          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.9), inset 0 0 0 1px rgba(255,255,255,0.04)',
-        }}>
-          {Array.from({ length: segments }, (_, i) => {
-            const segLevel = 1 - (i + 1) / segments;
-            const lit = level > segLevel;
-            const isPeak = col === 0 && Math.abs(peakRef.current - (1 - i / segments)) < 1.2 / segments;
-            const segColor = i <= 1 ? '#ff3333' : i <= 3 ? '#ff9900' : color;
-            return (
-              <div key={i} style={{
-                flex: 1, borderRadius: 1,
-                background: lit ? segColor : isPeak ? segColor + 'cc' : 'rgba(255,255,255,0.06)',
-                boxShadow: lit ? `0 0 3px ${segColor}88` : 'none',
-                transition: lit ? 'none' : 'background 0.04s',
-              }} />
-            );
-          })}
-        </div>
-      ))}
-    </div>
+    <canvas
+      ref={canvasRef}
+      style={{ width: VU_WIDTH, height: VU_HEIGHT, display: 'block' }}
+    />
   );
 }
 
@@ -274,51 +281,53 @@ function ChannelStrip({ index }: { index: number }) {
 }
 
 // ── Master horizontal output meter ────────────────────────────────────────────
+const OUT_SEGMENTS = 24;
+const OUT_SEG_W = 8;   // 7px bar + 1px gap
+const OUT_W = OUT_SEGMENTS * OUT_SEG_W + 6; // +padding
+const OUT_H = 20;      // two 8px rows + gap
 function OutputMeter() {
-  const [level, setLevel] = useState(0);
-  const peakRef = useRef(0);
-  const peakHoldRef = useRef(0);
-  const animRef = useRef<number>(0);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number>(0);
 
   useEffect(() => {
-    const tick = () => {
-      animRef.current = requestAnimationFrame(tick);
-      const raw = audioEngine.getChannelLevel(7);
-      const scaled = Math.min(1, raw * 8);
-      setLevel(scaled);
-      if (scaled > peakRef.current) { peakRef.current = scaled; peakHoldRef.current = 70; }
-      else { peakHoldRef.current--; if (peakHoldRef.current <= 0) peakRef.current = Math.max(0, peakRef.current - 0.012); }
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const dpr = window.devicePixelRatio || 1;
+    cvs.width = OUT_W * dpr; cvs.height = OUT_H * dpr;
+    const ctx = cvs.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    let peak = 0;
+    let peakHold = 0;
+    const draw = () => {
+      rafRef.current = requestAnimationFrame(draw);
+      const level = Math.min(1, audioEngine.getChannelLevel(7) * 8);
+      if (level > peak) { peak = level; peakHold = 70; }
+      else { peakHold--; if (peakHold <= 0) peak = Math.max(0, peak - 0.012); }
+
+      ctx.clearRect(0, 0, OUT_W, OUT_H);
+      for (const rowY of [0, 10]) {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, rowY, OUT_W, 8);
+        for (let i = 0; i < OUT_SEGMENTS; i++) {
+          const segLevel = (i + 1) / OUT_SEGMENTS;
+          const lit = level >= segLevel;
+          const isPeak = rowY === 0 && Math.abs(peak - segLevel) < 1.5 / OUT_SEGMENTS;
+          if (!lit && !isPeak) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; }
+          else {
+            const segColor = i >= 20 ? '#ff2222' : i >= 16 ? '#ff9900' : '#00ee55';
+            ctx.fillStyle = lit ? segColor : segColor + 'bb';
+          }
+          ctx.fillRect(3 + i * OUT_SEG_W, rowY + 1, 7, 6);
+        }
+      }
     };
-    animRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animRef.current);
+    rafRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
-  const segments = 24;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {[0, 1].map(col => (
-        <div key={col} style={{
-          display: 'flex', gap: 1, height: 8, alignItems: 'center',
-          background: 'rgba(0,0,0,0.6)', borderRadius: 2, padding: '1px 3px',
-          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.8)',
-        }}>
-          {Array.from({ length: segments }, (_, i) => {
-            const segLevel = (i + 1) / segments;
-            const lit = level >= segLevel;
-            const isPeak = col === 0 && Math.abs(peakRef.current - segLevel) < 1.5 / segments;
-            const segColor = i >= 20 ? '#ff2222' : i >= 16 ? '#ff9900' : '#00ee55';
-            return (
-              <div key={i} style={{
-                width: 7, height: 6, borderRadius: 1,
-                background: lit ? segColor : isPeak ? segColor + 'bb' : 'rgba(255,255,255,0.05)',
-                boxShadow: lit && i >= 16 ? `0 0 4px ${segColor}99` : 'none',
-              }} />
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
+  return <canvas ref={canvasRef} style={{ width: OUT_W, height: OUT_H, display: 'block' }} />;
 }
 
 // ── Mixer ─────────────────────────────────────────────────────────────────────
