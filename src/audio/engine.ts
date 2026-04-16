@@ -170,6 +170,11 @@ class AudioEngine {
   recordingStream: MediaStream | null = null;
   recordingDest: MediaStreamAudioDestinationNode | null = null;
 
+  // Keep-alive: a silent looping source that prevents the OS audio device from
+  // entering low-power mode. Without this, returning to an idle tab pays a
+  // multi-second "warm-up" while the driver restores its low-latency buffer size.
+  keepAliveSource: AudioBufferSourceNode | null = null;
+
   // Schedule offset: use baseLatency (one audio frame) so notes always land in the next
   // processing block. Falls back to 0.005 on browsers that don't expose baseLatency yet.
   get scheduleOffset(): number {
@@ -305,6 +310,44 @@ class AudioEngine {
     this.fxBusInput!.connect(this.channelAnalysers[6]);
     // Ch 7 (Master) meter taps the post-FX master fader output
     this.masterFaderNode!.connect(this.channelAnalysers[7]);
+
+    this.startKeepAlive();
+    this.installVisibilityHandler();
+  }
+
+  // When the tab returns to the foreground after being hidden, the AudioContext
+  // may be suspended and the keep-alive source may have been stopped. Resume
+  // and restart so the first note after return doesn't pay the warm-up cost.
+  private visibilityHandlerInstalled = false;
+  private installVisibilityHandler() {
+    if (this.visibilityHandlerInstalled || typeof document === 'undefined') return;
+    this.visibilityHandlerInstalled = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !this.ctx) return;
+      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+      // onended nulls the ref if the source died — spin up a fresh one.
+      if (!this.keepAliveSource) this.startKeepAlive();
+    });
+  }
+
+  // Silent looping buffer kept connected to destination so the OS audio device
+  // never goes idle. Fixes the return-to-tab-after-idle latency spike where the
+  // driver takes several seconds to reach its normal low-latency state.
+  private startKeepAlive() {
+    if (!this.ctx || this.keepAliveSource) return;
+    const ctx = this.ctx;
+    const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(ctx.destination);
+    // If the node ever stops (shouldn't happen, but some browsers kill it on tab hide),
+    // clear the ref so the visibility handler can spin up a replacement.
+    source.onended = () => {
+      if (this.keepAliveSource === source) this.keepAliveSource = null;
+    };
+    try { source.start(); } catch {}
+    this.keepAliveSource = source;
   }
 
   setChannelSend(channelIdx: number, amount: number) {
