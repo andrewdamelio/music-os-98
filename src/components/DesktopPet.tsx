@@ -94,20 +94,22 @@ interface AnimDef {
 
 const ANIMS: Record<SheepState, AnimDef> = {
   idle: {
-    frames: [{ idx: 3, ms: 300 }, { idx: 3, ms: 300 }],
+    // Longer frame duration so the idle.next() roll happens far less often.
+    frames: [{ idx: 3, ms: 900 }, { idx: 3, ms: 900 }],
     loop: false,
     next: () => {
       const r = Math.random();
-      if (r < 0.35) return 'walk';
-      if (r < 0.45) return 'run_begin';
-      if (r < 0.54) return 'graze';
-      if (r < 0.62) return 'sleep1a';
-      if (r < 0.68) return 'sleep2a';
-      if (r < 0.73) return 'sit';
-      if (r < 0.80) return 'poo_sit';
-      if (r < 0.86) return 'poo_yawn';
-      if (r < 0.92) return 'poo_sleep';
-      if (r < 0.97) return 'poo_roll';
+      // ~15% walk, ~7% split across everything else, ~78% stay idle.
+      if (r < 0.15)  return 'walk';
+      if (r < 0.17)  return 'run_begin';
+      if (r < 0.185) return 'graze';
+      if (r < 0.195) return 'sleep1a';
+      if (r < 0.200) return 'sleep2a';
+      if (r < 0.205) return 'sit';
+      if (r < 0.210) return 'poo_sit';
+      if (r < 0.215) return 'poo_yawn';
+      if (r < 0.218) return 'poo_sleep';
+      if (r < 0.220) return 'poo_roll';
       return 'idle';
     },
   },
@@ -951,9 +953,9 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       setFlower(f);
     };
     const schedule = (): ReturnType<typeof setTimeout> => {
-      return setTimeout(() => { spawn(); schedule(); }, 20000 + Math.random() * 25000);
+      return setTimeout(() => { spawn(); schedule(); }, 90000 + Math.random() * 120000);
     };
-    const first = setTimeout(spawn, 15000);
+    const first = setTimeout(spawn, 60000);
     const recurring = schedule();
     return () => { clearTimeout(first); clearTimeout(recurring); };
   }, [visible]);
@@ -1003,7 +1005,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
   useEffect(() => {
     if (!visible) return;
     const schedule = (): ReturnType<typeof setTimeout> => {
-      return setTimeout(() => { triggerSpecialEvent(); schedule(); }, 25000 + Math.random() * 35000);
+      return setTimeout(() => { triggerSpecialEvent(); schedule(); }, 90000 + Math.random() * 120000);
     };
     const t = schedule();
     return () => clearTimeout(t);
