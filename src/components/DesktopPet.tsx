@@ -98,25 +98,25 @@ const ANIMS: Record<SheepState, AnimDef> = {
     loop: false,
     next: () => {
       const r = Math.random();
-      if (r < 0.18) return 'walk';
-      if (r < 0.30) return 'run_begin';
-      if (r < 0.40) return 'graze';
-      if (r < 0.50) return 'sleep1a';
-      if (r < 0.58) return 'sleep2a';
-      if (r < 0.64) return 'sit';
-      if (r < 0.72) return 'poo_sit';
-      if (r < 0.80) return 'poo_yawn';
-      if (r < 0.88) return 'poo_sleep';
-      if (r < 0.94) return 'poo_roll';
+      if (r < 0.35) return 'walk';
+      if (r < 0.45) return 'run_begin';
+      if (r < 0.54) return 'graze';
+      if (r < 0.62) return 'sleep1a';
+      if (r < 0.68) return 'sleep2a';
+      if (r < 0.73) return 'sit';
+      if (r < 0.80) return 'poo_sit';
+      if (r < 0.86) return 'poo_yawn';
+      if (r < 0.92) return 'poo_sleep';
+      if (r < 0.97) return 'poo_roll';
       return 'idle';
     },
   },
   walk: {
-    // Frames 4/5 are the mid-stride leg poses (2 legs visible); 2/3 are stand poses
-    // with all 4 legs planted, which makes the walk look stuttery. Alternate 4/5 only.
-    frames: [{ idx: 4, ms: 200 }, { idx: 5, ms: 200 }],
-    loop: true, vx: 0.5,
-    next: () => { const r = Math.random(); if (r < 0.15) return 'idle'; if (r < 0.25) return 'run_begin'; return 'walk'; },
+    // Frames 4/5 are the only leg-motion frames; 2/3 are stand-still poses.
+    // Slow tempo + low vx differentiates walk visually from run (same frames, faster).
+    frames: [{ idx: 4, ms: 340 }, { idx: 5, ms: 340 }],
+    loop: true, vx: 0.3,
+    next: () => { const r = Math.random(); if (r < 0.12) return 'idle'; if (r < 0.18) return 'run_begin'; return 'walk'; },
   },
   run_begin: {
     frames: [{ idx: 2, ms: 110 }, { idx: 3, ms: 110 }, { idx: 2, ms: 110 }, { idx: 5, ms: 110 }, { idx: 4, ms: 110 }, { idx: 5, ms: 110 }],
@@ -344,6 +344,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
   const [bathtubProp, setBathtubProp] = useState<{ x: number; y: number; frame: number } | null>(null);
   const bathtubPropRef = useRef<{ x: number; y: number; frame: number; startTs: number; splash?: boolean } | null>(null);
   const [splashHideSheep, setSplashHideSheep] = useState(false);
+  const splashHideRef = useRef(false);
   const [secondSheepDisplay, setSecondSheepDisplay] = useState<SecondSheep | null>(null);
   const [alienDisplay, setAlienDisplay] = useState<AlienDisplay | null>(null);
   const [ufoDisplay, setUfoDisplay] = useState<UfoDisplay | null>(null);
@@ -690,6 +691,7 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
       if (elapsed > 3500) {
         bathtubPropRef.current = null;
         setBathtubProp(null);
+        splashHideRef.current = false;
         setSplashHideSheep(false);
       }
     }
@@ -867,6 +869,9 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
         bathtubPropRef.current = { x: btX, y: btY, frame: 3, startTs: ts, splash: true };
         setBathtubProp({ x: btX, y: btY, frame: 3 });
         // Hide the sheep while the splash animation plays — it re-appears once the prop clears.
+        // The ref also freezes state transitions so idle.next() doesn't pick sit/yawn/etc
+        // during the splash (which would then show when the sheep reappears).
+        splashHideRef.current = true;
         setSplashHideSheep(true);
       }
     }
@@ -878,7 +883,9 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
     }
 
     // ── Animate frames ────────────────────────────────────────────────────
-    if (ts >= nextFrameTimeRef.current) {
+    // While the bathtub splash is playing, the sheep is hidden — freeze its
+    // animation so its state doesn't advance into sit/yawn/etc mid-splash.
+    if (ts >= nextFrameTimeRef.current && !splashHideRef.current) {
       const anim = ANIMS[stateRef.current];
       frameIdxRef.current++;
       if (frameIdxRef.current >= anim.frames.length) {
