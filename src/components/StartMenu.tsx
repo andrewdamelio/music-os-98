@@ -58,6 +58,7 @@ const MENU: TopItem[] = [
     kind: 'category', label: 'Games & Fun', icon: '🎮',
     items: [
       { label: 'SkiFree',    icon: '⛷️', appId: 'ski-free' },
+      { label: 'Minesweeper', icon: '💣', appId: 'minesweeper' },
       { label: 'Screen Mate Poo', icon: '🐑', appId: 'screen-mate' },
       { label: 'SubSeven',  icon: '💀', appId: 'sub-seven' },
     ],

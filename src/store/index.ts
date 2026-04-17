@@ -83,6 +83,7 @@ export const APPS: AppDef[] = [
   { id: 'help', title: 'Help & Manual', icon: '❓', component: 'Help', defaultSize: { w: 620, h: 520 }, singleton: true },
   { id: 'oscilloscope', title: 'Oscilloscope', icon: '📊', component: 'Oscilloscope', defaultSize: { w: 580, h: 240 }, singleton: true },
   { id: 'freecell', title: 'FreeCell', icon: '🃏', component: 'FreeCell', defaultSize: { w: 680, h: 520 }, singleton: true },
+  { id: 'minesweeper', title: 'Minesweeper', icon: '💣', component: 'Minesweeper', defaultSize: { w: 184, h: 274 }, singleton: true },
   { id: 'milkdrop', title: 'MilkDrop Viz', icon: '🌊', component: 'MilkDrop', defaultSize: { w: 520, h: 420 }, singleton: true },
   { id: 'compressor', title: 'Compressor', icon: '🔊', component: 'Compressor', defaultSize: { w: 560, h: 320 }, singleton: true },
   { id: 'eq', title: 'Parametric EQ', icon: '🎛️', component: 'EQ', defaultSize: { w: 580, h: 420 }, singleton: true },

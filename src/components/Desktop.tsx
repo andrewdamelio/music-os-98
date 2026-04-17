@@ -3,7 +3,7 @@ import Taskbar from './Taskbar';
 import ContextMenu from './ContextMenu';
 import TransportBar from './TransportBar';
 import Window from './Window';
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 
 const WALLPAPERS = [
   // Dark
@@ -47,6 +47,7 @@ import Compressor from '../apps/Compressor';
 import EQ from '../apps/EQ';
 import MilkDrop from '../apps/MilkDrop';
 import FreeCell from '../apps/FreeCell';
+import Minesweeper, { MinesweeperIcon } from '../apps/Minesweeper';
 import scmpoo103 from '../assets/scmpoo103.png';
 import DesktopPet from './DesktopPet';
 import SubSeven from '../apps/SubSeven';
@@ -114,6 +115,7 @@ const APP_MAP: Record<string, React.ComponentType> = {
   EQ,
   MilkDrop,
   FreeCell,
+  Minesweeper,
   SubSeven,
   ControlPanel,
   ICQ,
@@ -137,10 +139,29 @@ const DESKTOP_ICONS = [
   { id: 'ski-free', label: 'SkiFree', icon: '⛷️' },
   { id: 'screen-mate', label: 'Screen Mate Poo', icon: '🐑', iconImg: { src: scmpoo103, frame: 0 } },
   { id: 'freecell', label: 'FreeCell', icon: '🃏' },
+  { id: 'minesweeper', label: 'Minesweeper', icon: '💣', iconSvg: true },
   { id: 'milkdrop', label: 'MilkDrop Viz', icon: '🌊' },
   { id: 'sub-seven', label: 'SubSeven', icon: '💀', iconSvg: true },
   { id: 'napster', label: 'Napster', icon: '🐱', iconSvg: true },
 ];
+
+// Per-icon box size used to compute the default grid layout.
+const ICON_GRID_W = 80;
+const ICON_GRID_H = 72;
+const ICON_MARGIN = 12;
+
+type IconPositions = Record<string, { x: number; y: number }>;
+
+function defaultIconPositions(ids: string[]): IconPositions {
+  const rowsPerCol = Math.max(1, Math.floor((window.innerHeight - 140) / ICON_GRID_H));
+  const out: IconPositions = {};
+  ids.forEach((id, i) => {
+    const col = Math.floor(i / rowsPerCol);
+    const row = i % rowsPerCol;
+    out[id] = { x: ICON_MARGIN + col * ICON_GRID_W, y: ICON_MARGIN + row * ICON_GRID_H };
+  });
+  return out;
+}
 
 export default function Desktop() {
   const { windows, openApp, showContextMenu, hideContextMenu, setStartMenuOpen,
@@ -152,6 +173,63 @@ export default function Desktop() {
   });
   const [petVisible, setPetVisible] = useState(() => localStorage.getItem('musicOS98_pet') === '1');
   const loadFileRef = useRef<HTMLInputElement>(null);
+
+  const [iconPositions, setIconPositions] = useState<IconPositions>(() => {
+    try {
+      const raw = localStorage.getItem('musicOS98_iconPositions');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {};
+  });
+
+  // Merge saved positions with defaults so newly-added icons still appear even
+  // if the user had saved a prior layout.
+  const effectivePositions = useMemo(() => {
+    const defaults = defaultIconPositions(DESKTOP_ICONS.map(i => i.id));
+    return { ...defaults, ...iconPositions };
+  }, [iconPositions]);
+
+  const desktopAreaRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ id: string; offsetX: number; offsetY: number; startX: number; startY: number; moved: boolean } | null>(null);
+
+  const rearrangeIcons = useCallback(() => {
+    setIconPositions({});
+    try { localStorage.removeItem('musicOS98_iconPositions'); } catch {}
+  }, []);
+
+  // Global drag handlers — one mousemove/mouseup pair handles every icon.
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      const s = dragRef.current;
+      if (!s) return;
+      if (!s.moved && Math.hypot(e.clientX - s.startX, e.clientY - s.startY) > 3) {
+        s.moved = true;
+      }
+      if (!s.moved) return;
+      const area = desktopAreaRef.current;
+      if (!area) return;
+      const rect = area.getBoundingClientRect();
+      const x = Math.max(0, Math.min(rect.width  - ICON_GRID_W, e.clientX - rect.left - s.offsetX));
+      const y = Math.max(0, Math.min(rect.height - ICON_GRID_H, e.clientY - rect.top  - s.offsetY));
+      setIconPositions(prev => ({ ...prev, [s.id]: { x, y } }));
+    };
+    const up = () => {
+      const s = dragRef.current;
+      if (s && s.moved) {
+        setIconPositions(prev => {
+          try { localStorage.setItem('musicOS98_iconPositions', JSON.stringify(prev)); } catch {}
+          return prev;
+        });
+      }
+      dragRef.current = null;
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+  }, []);
 
   // SubSeven fun effect: rotate wallpaper
   useEffect(() => {
@@ -191,6 +269,9 @@ export default function Desktop() {
   }, [isPlaying, play, stop]);
 
   const handleDesktopContextMenu = useCallback((e: React.MouseEvent) => {
+    // Only fire for clicks directly on the desktop background — not on icons
+    // (which stop propagation) or on windows (siblings of the .desktop-area node).
+    if (e.target !== e.currentTarget) return;
     e.preventDefault();
     showContextMenu(e.clientX, e.clientY, [
       {
@@ -200,6 +281,7 @@ export default function Desktop() {
           return next;
         }),
       },
+      { label: '📐 Arrange Icons', action: rearrangeIcons },
       { label: '🔊 Audio Control Panel', action: () => openApp('control-panel') },
       { separator: true, label: '', action: () => {} },
       {
@@ -216,7 +298,7 @@ export default function Desktop() {
       { separator: true, label: '', action: () => {} },
       { label: 'ℹ️ About MusicOS 98', action: () => openApp('help') },
     ]);
-  }, [showContextMenu, openApp, saveProject, clearDrumPattern, loadDefaultPattern, setProjectName]);
+  }, [showContextMenu, openApp, saveProject, clearDrumPattern, loadDefaultPattern, setProjectName, rearrangeIcons]);
 
   const getAppComponent = (appId: string) => {
     const app = APPS.find(a => a.id === appId);
@@ -229,7 +311,6 @@ export default function Desktop() {
       className="desktop"
       style={{ background: WALLPAPERS[wallpaperIdx] }}
       onClick={() => { hideContextMenu(); setStartMenuOpen(false); }}
-      onContextMenu={handleDesktopContextMenu}
     >
       {/* Hidden file input for project loading */}
       <input
@@ -249,13 +330,38 @@ export default function Desktop() {
           e.target.value = '';
         }}
       />
-      {/* Desktop icons */}
-      <div className="desktop-area">
-        <div style={{ display: 'flex', flexDirection: 'column', flexWrap: 'wrap', gap: 8, maxHeight: 'calc(100vh - 80px)', alignContent: 'flex-start' }}>
-          {DESKTOP_ICONS.map(icon => (
+      {/* Desktop icons — absolutely-positioned, draggable, positions persisted.
+          The .desktop-area background owns the right-click menu (scoped via
+          target===currentTarget so icons and windows don't trigger it). */}
+      <div
+        ref={desktopAreaRef}
+        className="desktop-area"
+        style={{ padding: 0 }}
+        onContextMenu={handleDesktopContextMenu}
+      >
+        {DESKTOP_ICONS.map(icon => {
+          const pos = effectivePositions[icon.id] ?? { x: ICON_MARGIN, y: ICON_MARGIN };
+          return (
             <div
               key={icon.id}
               className="desktop-icon"
+              style={{ position: 'absolute', left: pos.x, top: pos.y }}
+              onMouseDown={e => {
+                if (e.button !== 0) return;
+                const area = desktopAreaRef.current;
+                if (!area) return;
+                const rect = area.getBoundingClientRect();
+                dragRef.current = {
+                  id: icon.id,
+                  offsetX: e.clientX - rect.left - pos.x,
+                  offsetY: e.clientY - rect.top  - pos.y,
+                  startX: e.clientX,
+                  startY: e.clientY,
+                  moved: false,
+                };
+                // prevent text-selection while dragging; double-click still fires.
+                e.preventDefault();
+              }}
               onDoubleClick={() => {
                 if (icon.id === 'screen-mate') { setPetVisible(v => { const next = !v; localStorage.setItem('musicOS98_pet', next ? '1' : '0'); return next; }); return; }
                 openApp(icon.id);
@@ -275,16 +381,21 @@ export default function Desktop() {
                   backgroundPosition: `-${(icon as { iconImg: { src: string; frame: number } }).iconImg.frame * 32}px 0`,
                   backgroundSize: 'auto 32px',
                   imageRendering: 'pixelated',
+                  pointerEvents: 'none',
                 }} />
               ) : (icon as { iconSvg?: boolean }).iconSvg ? (
-                icon.id === 'napster' ? <NapsterCatIcon size={32} /> : <SubSevenIcon size={32} />
+                <div style={{ pointerEvents: 'none' }}>
+                  {icon.id === 'napster' ? <NapsterCatIcon size={32} />
+                    : icon.id === 'minesweeper' ? <MinesweeperIcon size={32} />
+                    : <SubSevenIcon size={32} />}
+                </div>
               ) : (
-                <div className="desktop-icon-emoji">{icon.icon}</div>
+                <div className="desktop-icon-emoji" style={{ pointerEvents: 'none' }}>{icon.icon}</div>
               )}
-              <div className="desktop-icon-label">{icon.label}</div>
+              <div className="desktop-icon-label" style={{ pointerEvents: 'none' }}>{icon.label}</div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {/* Windows */}
