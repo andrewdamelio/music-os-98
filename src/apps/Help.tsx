@@ -305,6 +305,35 @@ Auto-move:
 Cards safely eligible for foundation are moved automatically after each turn.`,
   },
   {
+    title: '💣 Minesweeper',
+    content: `Classic Windows 95 Minesweeper — pixel-authentic recreation.
+
+Goal:
+Uncover every non-mine cell without detonating one.
+
+Controls:
+• Left click — reveal a cell
+• Right click — cycle flag → question → clear
+• Left + Right (chord) — if a number is fully flagged, reveal its neighbors
+• Middle click — same as chord-reveal
+• Click the smiley — start a new game
+• F2 — start a new game
+
+Difficulty:
+• Beginner     — 9×9 grid, 10 mines
+• Intermediate — 16×16 grid, 40 mines
+• Expert       — 16×30 grid, 99 mines
+The window auto-resizes when you change difficulty.
+
+Rules:
+• Your first click is always safe (the tile and its 8 neighbors are guaranteed mine-free)
+• Numbers show how many mines touch that cell (1–8)
+• The LCD counter shows mines remaining (minus flags placed)
+• The LCD timer starts on your first click and stops when you win or lose
+
+Best times saved per difficulty and persist between sessions.`,
+  },
+  {
     title: '⛷️ SkiFree',
     content: `A remake of the classic Windows 3.x SkiFree game.
 
@@ -363,6 +392,80 @@ Based on eSheep64 by Adrianotiger (sprite used with thanks).
 Scmpoo sprite sheets by original ScreenMate authors.`,
   },
   {
+    title: '🌸 ICQ',
+    content: `Pixel-perfect recreation of the late-90s ICQ instant messenger.
+
+Features:
+• Contact list with online/away/offline indicators
+• Receive scripted messages from contacts over time
+• "Uh-oh!" knock sound when a new message arrives
+• Flower icon blinks in the taskbar when you have unread mail
+• Double-click a contact to open a chat window
+• Status selector — Available, Away, N/A, Occupied, DND, Invisible
+• Authentic Win95 chrome and window styling
+
+Contacts and chat state are not persisted between sessions —
+each boot starts fresh.`,
+  },
+  {
+    title: '🐱 Napster',
+    content: `Napster 2.0 beta — the original peer-to-peer music sharing client.
+
+Features:
+• Search by artist or song title across a fake catalog
+• Browse fake users' shared music libraries
+• Download progress bar with simulated transfer speeds
+• Chat rooms: #general, #electronic, #rock, #hiphop
+• Hotlist of favorite users
+• Server messages and MOTD
+
+Everything is a period-accurate simulation — no actual files are
+downloaded. The catalog is seeded at boot with 1999-era artists.
+
+Click the dancing cat icon in the title bar to see it shimmy.`,
+  },
+  {
+    title: '💀 SubSeven',
+    content: `SubSeven 2.2 Gold — a "remote administration tool" from 1999.
+
+This is a harmless tribute to the infamous trojan's UI. It cannot
+do anything to your real computer — only the in-app desktop is
+a target.
+
+What it actually does:
+• "Connect" to a fake victim IP (configurable)
+• Run fun effects on MusicOS itself:
+  — Open/close the CD tray (animation)
+  — Flip the screen upside down
+  — Make the mouse jitter
+  — Swap screen colors
+  — Play spooky sounds
+  — Send fake error dialogs to the desktop
+  — Enable "matrix mode"
+
+The tool is entirely self-contained — nothing escapes the
+browser tab. Pure nostalgic mischief.`,
+  },
+  {
+    title: '🔊 Audio Control Panel',
+    content: `Classic Win95-style control panel for master audio settings.
+
+Sliders and toggles:
+• Master Volume — overall output level
+• Wave Volume — playback bus
+• MIDI Volume — sequencer/synth bus
+• CD Audio — tape deck / sampler bus
+• Mute — master mute with LED indicator
+
+Driver info panel shows:
+• Audio Device: SoundBlaster AWE64 Gold (emulated)
+• Sample rate: 44.1kHz, 24-bit
+• Channels: stereo
+
+All settings are live — they route through the real Web Audio
+graph and are saved between sessions.`,
+  },
+  {
     title: '⌨️ Keyboard & Controls',
     content: `Global:
 • SPACE — Play / Stop transport
@@ -370,6 +473,11 @@ Scmpoo sprite sheets by original ScreenMate authors.`,
 SynthStation (keyboard focus):
 • A W S E D F T G Y H U J K O L P — Piano notes
 • Z — Octave down | X — Octave up
+
+Minesweeper:
+• F2 — New game
+• Left click — reveal | Right click — flag/question cycle
+• Left+Right or middle click — chord reveal
 
 Transport bar:
 • Click project name to rename (Enter to confirm, Esc to cancel)
@@ -382,8 +490,14 @@ Window management:
 • Drag window edge/corner — Resize
 • Click taskbar button — Focus or minimize window
 
-Desktop right-click:
+Desktop icons:
+• Drag any icon to reposition it anywhere on the desktop
+• Position is saved in localStorage and persists between sessions
+• Double-click to open the app (click-vs-drag is auto-detected)
+
+Desktop right-click (on empty desktop only):
 • Change Wallpaper — cycle 17 gradients (saved in localStorage)
+• 📐 Arrange Icons — restore default grid positions
 • New Project — clear and start fresh
 • Save Project — download .mos98 file
 • Open Project — load .mos98 file
@@ -393,28 +507,44 @@ Desktop right-click:
     title: '💾 Projects',
     content: `Save and load your entire project state.
 
-Save:
+Auto-save (new!):
+MusicOS 98 now auto-saves your project continuously in the
+background. Every change is written to localStorage within
+~800ms, so you can close the tab and come back where you left off.
+On next boot, the last auto-saved project is restored automatically.
+
+Manual save / load:
 • Click 💾 in the transport bar, or
 • Right-click desktop → Save Project
 • Downloads a .mos98 file (JSON format)
 
-Load:
 • Click 📂 in the transport bar, or
 • Right-click desktop → Open Project...
 • Accepts .mos98 and .json files
 
-What is saved:
+What is saved (auto + manual):
 • Project name and BPM
 • Full drum patterns (A/B/C/D) + swing + step count + channel gains
-• All synth parameters
-• Piano roll notes and loop length
+• All synth parameters + active patch
+• Piano roll notes, loop length, and on/off state
+• Pad Machine assignments
 • Mixer channel states (gain, pan, mute, solo, FX sends)
-• FX Rack settings
+• FX Rack, Compressor, and EQ settings
+• ICQ status
+• Open window positions and sizes
+
+Per-app settings (saved separately in localStorage):
+• Oscilloscope — mode, color, gain
+• Desktop icon positions
+• Wallpaper preference
+• Synth user patches
+• Minesweeper best times
+• SkiFree high score
 
 What is NOT saved:
-• Synth patches (stored separately in localStorage)
 • Uploaded samples in Pad Machine (audio data too large)
-• Wallpaper preference (stored in localStorage separately)`,
+• In-memory Sampler audio (re-upload after refresh)
+• ICQ chat history`,
   },
   {
     title: '🐛 Tips & Easter Eggs',
@@ -424,10 +554,17 @@ What is NOT saved:
 • Dot-matrix visualizer in SynthStation tracks note frequency position
 • Boot screen has a fake BIOS POST sequence on first load
 • Right-click desktop → Change Wallpaper cycles 17 gradients
+• Drag any desktop icon anywhere — positions are saved
+• Right-click desktop → Arrange Icons to restore default grid
 • Drag and throw the ScreenMate poo — it has real momentum physics
+• ScreenMate poo eats flowers, climbs walls, and gets abducted by UFOs
+• ICQ contacts send you real-time scripted messages with knock sounds
+• SubSeven's "effects" genuinely mess with the MusicOS desktop (safely)
 • MilkDrop Matrix Rain reacts to audio — frequency drives fall speed
 • Compressor GR meter shows how hard it's working in real time
 • EQ frequency curve updates live as you drag band faders
+• Minesweeper: double-click a number with the right count of flags to chord-reveal
+• Close the tab anytime — auto-save restores everything on next boot
 
 Performance tips:
 • FX Rack reverb is most CPU-intensive — keep wet mix low

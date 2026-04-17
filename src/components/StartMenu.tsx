@@ -57,16 +57,25 @@ const MENU: TopItem[] = [
   {
     kind: 'category', label: 'Games & Fun', icon: '🎮',
     items: [
-      { label: 'SkiFree',    icon: '⛷️', appId: 'ski-free' },
-      { label: 'Minesweeper', icon: '💣', appId: 'minesweeper' },
+      { label: 'SkiFree',        icon: '⛷️', appId: 'ski-free' },
+      { label: 'Minesweeper',    icon: '💣', appId: 'minesweeper' },
+      { label: 'FreeCell',       icon: '🃏', appId: 'freecell' },
       { label: 'Screen Mate Poo', icon: '🐑', appId: 'screen-mate' },
-      { label: 'SubSeven',  icon: '💀', appId: 'sub-seven' },
+      { label: 'SubSeven',       icon: '💀', appId: 'sub-seven' },
+    ],
+  },
+  {
+    kind: 'category', label: 'Internet', icon: '🌐',
+    items: [
+      { label: 'ICQ',     icon: '🌸', appId: 'icq' },
+      { label: 'Napster', icon: '🐱', appId: 'napster' },
     ],
   },
   {
     kind: 'category', label: 'System', icon: '💻',
     items: [
-      { label: 'Help & Manual', icon: '❓', appId: 'help' },
+      { label: 'Audio Control Panel', icon: '🔊', appId: 'control-panel' },
+      { label: 'Help & Manual',       icon: '❓', appId: 'help' },
     ],
   },
   { kind: 'separator' },

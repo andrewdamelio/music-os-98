@@ -96,6 +96,40 @@ export const APPS: AppDef[] = [
   { id: 'napster', title: 'Napster', icon: '🐱', component: 'Napster', defaultSize: { w: 760, h: 540 }, singleton: true },
 ];
 
+// ── Auto-save ──────────────────────────────────────────────────────────────
+// All persistable project state lives here; ephemeral fields (isPlaying,
+// currentStep, isRecording, window focus, context menus) are intentionally
+// excluded so serialization is stable during playback.
+export const AUTOSAVE_KEY = 'musicOS98_project';
+
+function serializeProjectState(s: OSStore): string {
+  return JSON.stringify({
+    version: 2,
+    projectName: s.projectName,
+    bpm: s.bpm,
+    drumPatterns: s.drumPatterns,
+    currentPatternIdx: s.currentPatternIdx,
+    drumStepCount: s.drumStepCount,
+    drumSwing: s.drumSwing,
+    drumChannelGains: s.drumChannelGains,
+    synthParams: s.synthParams,
+    activeSynthPatch: s.activeSynthPatch,
+    pianoNotes: s.pianoNotes,
+    pianoRollEnabled: s.pianoRollEnabled,
+    pianoRollBeats: s.pianoRollBeats,
+    padAssignments: s.padAssignments,
+    mixerChannels: s.mixerChannels,
+    fxParams: s.fxParams,
+    compParams: s.compParams,
+    eqParams: s.eqParams,
+    icqStatus: s.icqStatus,
+    windows: s.windows.map(w => ({
+      appId: w.appId, x: w.x, y: w.y, w: w.w, h: w.h,
+      minimized: w.minimized, maximized: w.maximized,
+    })),
+  }, null, 2);
+}
+
 let zCounter = 100;
 let stepUnsub: (() => void) | null = null;
 let drumClipboard: boolean[][] | null = null;
@@ -415,39 +449,8 @@ export const useOSStore = create<OSStore>((set, get) => ({
 
   saveProject: () => {
     const s = get();
-    const data = {
-      version: 2,
-      projectName: s.projectName,
-      bpm: s.bpm,
-      // Drum machine — all 4 patterns + metadata
-      drumPatterns: s.drumPatterns,
-      currentPatternIdx: s.currentPatternIdx,
-      drumStepCount: s.drumStepCount,
-      drumSwing: s.drumSwing,
-      drumChannelGains: s.drumChannelGains,
-      // Synth
-      synthParams: s.synthParams,
-      activeSynthPatch: s.activeSynthPatch,
-      // Piano roll
-      pianoNotes: s.pianoNotes,
-      pianoRollEnabled: s.pianoRollEnabled,
-      pianoRollBeats: s.pianoRollBeats,
-      // Pad Machine (sample names + modes only — buffers are regenerated on load)
-      padAssignments: s.padAssignments,
-      // Mixer
-      mixerChannels: s.mixerChannels,
-      // FX chain
-      fxParams: s.fxParams,
-      compParams: s.compParams,
-      eqParams: s.eqParams,
-      // Window layout
-      windows: s.windows.map(w => ({
-        appId: w.appId, x: w.x, y: w.y, w: w.w, h: w.h,
-        minimized: w.minimized, maximized: w.maximized,
-      })),
-    };
-    const json = JSON.stringify(data, null, 2);
-    localStorage.setItem('musicOS98_project', json);
+    const json = serializeProjectState(s);
+    try { localStorage.setItem(AUTOSAVE_KEY, json); } catch {}
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -568,6 +571,9 @@ export const useOSStore = create<OSStore>((set, get) => ({
         set({ eqParams: eq });
       }
 
+      // ── Misc app state ────────────────────────────────────────────────────────
+      if (data.icqStatus) set({ icqStatus: data.icqStatus });
+
       // ── Window layout ─────────────────────────────────────────────────────────
       if (data.windows && Array.isArray(data.windows)) {
         const restored: WindowState[] = (data.windows as any[]).map(w => {
@@ -586,7 +592,7 @@ export const useOSStore = create<OSStore>((set, get) => ({
         set({ windows: restored, focusedWindowId: restored[restored.length - 1]?.instanceId ?? null });
       }
 
-      localStorage.setItem('musicOS98_project', json);
+      try { localStorage.setItem(AUTOSAVE_KEY, json); } catch {}
     } catch (e) {
       console.error('Failed to load project:', e);
     }
@@ -875,3 +881,25 @@ export const useOSStore = create<OSStore>((set, get) => ({
   icqStatus: 'online',
   setIcqStatus: (s) => set({ icqStatus: s }),
 }));
+
+// ── Auto-save subscription ────────────────────────────────────────────────
+// Throttled persistence: whenever persistable state changes, queue a write
+// at most once every 800ms. A serialization-hash check skips no-op writes
+// (so ephemeral-field changes like currentStep never trigger disk churn).
+let lastSaveHash = '';
+let autosaveScheduled = false;
+function scheduleAutoSave() {
+  if (autosaveScheduled) return;
+  autosaveScheduled = true;
+  setTimeout(() => {
+    autosaveScheduled = false;
+    try {
+      const json = serializeProjectState(useOSStore.getState());
+      if (json !== lastSaveHash) {
+        localStorage.setItem(AUTOSAVE_KEY, json);
+        lastSaveHash = json;
+      }
+    } catch {}
+  }, 800);
+}
+useOSStore.subscribe(scheduleAutoSave);

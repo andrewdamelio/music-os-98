@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useOSStore } from '../store';
+import { useOSStore, AUTOSAVE_KEY } from '../store';
 import { audioEngine } from '../audio/engine';
 
 const BIOS_LINES = [
@@ -35,6 +35,7 @@ const LOAD_STEPS = [
 export default function BootScreen() {
   const setBooted = useOSStore(s => s.setBooted);
   const loadDefaultPattern = useOSStore(s => s.loadDefaultPattern);
+  const loadProjectFromJSON = useOSStore(s => s.loadProjectFromJSON);
   const [biosLines, setBiosLines] = useState<string[]>([]);
   const [showLoader, setShowLoader] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -71,8 +72,16 @@ export default function BootScreen() {
     const bootTime = biosTotal + 100 + LOAD_STEPS.length * 180 + 400;
     const bootTimer = setTimeout(() => {
       try { audioEngine.init(); } catch {}
-      // Use the store action so the UI drum grid syncs too
-      try { loadDefaultPattern(); } catch {}
+      // Restore the last auto-saved project if one exists; otherwise seed the
+      // drum grid with the default pattern so there's something to play.
+      let restored = false;
+      try {
+        const saved = localStorage.getItem(AUTOSAVE_KEY);
+        if (saved) { loadProjectFromJSON(saved); restored = true; }
+      } catch {}
+      if (!restored) {
+        try { loadDefaultPattern(); } catch {}
+      }
       setBooted(true);
     }, bootTime);
     timers.push(bootTimer);

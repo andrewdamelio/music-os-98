@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { audioEngine } from '../audio/engine';
+import { usePersistentState } from '../utils/persist';
 
 type ViewMode = 'scope' | 'spectrum';
 
 export default function Oscilloscope() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
-  const [mode, setMode] = useState<ViewMode>('scope');
-  const [color, setColor] = useState('#00e5ff');
-  const [gain, setGain] = useState(1);
+  const [mode,  setMode]  = usePersistentState<ViewMode>('oscilloscope_mode',  'scope');
+  const [color, setColor] = usePersistentState<string>(  'oscilloscope_color', '#00e5ff');
+  const [gain,  setGain]  = usePersistentState<number>(  'oscilloscope_gain',  1);
 
   useEffect(() => {
     const canvas = canvasRef.current;
