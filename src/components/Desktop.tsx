@@ -1,4 +1,5 @@
 import { useOSStore, APPS } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import Taskbar from './Taskbar';
 import ContextMenu from './ContextMenu';
 import TransportBar from './TransportBar';
@@ -166,7 +167,15 @@ function defaultIconPositions(ids: string[]): IconPositions {
 export default function Desktop() {
   const { windows, openApp, showContextMenu, hideContextMenu, setStartMenuOpen,
     isPlaying, play, stop, saveProject, loadProjectFromJSON, loadDefaultPattern,
-    clearDrumPattern, setProjectName } = useOSStore();
+    clearDrumPattern, setProjectName } = useOSStore(useShallow(s => ({
+      windows: s.windows, openApp: s.openApp,
+      showContextMenu: s.showContextMenu, hideContextMenu: s.hideContextMenu,
+      setStartMenuOpen: s.setStartMenuOpen,
+      isPlaying: s.isPlaying, play: s.play, stop: s.stop,
+      saveProject: s.saveProject, loadProjectFromJSON: s.loadProjectFromJSON,
+      loadDefaultPattern: s.loadDefaultPattern, clearDrumPattern: s.clearDrumPattern,
+      setProjectName: s.setProjectName,
+    })));
   const [wallpaperIdx, setWallpaperIdx] = useState(() => {
     const saved = localStorage.getItem('musicOS98_wallpaper');
     return saved ? parseInt(saved, 10) % WALLPAPERS.length : 0;

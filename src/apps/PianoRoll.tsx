@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback } from 'react';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { audioEngine } from '../audio/engine';
 
 const NOTE_HEIGHT = 13;
@@ -62,7 +63,16 @@ function TGroup({ label, children }: { label: string; children: React.ReactNode 
 
 export default function PianoRoll() {
   const { pianoNotes, addPianoNote, removePianoNote, pianoRollEnabled, togglePianoRoll,
-    isPlaying, pianoRollBeats, setPianoRollBeats } = useOSStore();
+    isPlaying, pianoRollBeats, setPianoRollBeats } = useOSStore(useShallow(s => ({
+      pianoNotes: s.pianoNotes,
+      addPianoNote: s.addPianoNote,
+      removePianoNote: s.removePianoNote,
+      pianoRollEnabled: s.pianoRollEnabled,
+      togglePianoRoll: s.togglePianoRoll,
+      isPlaying: s.isPlaying,
+      pianoRollBeats: s.pianoRollBeats,
+      setPianoRollBeats: s.setPianoRollBeats,
+    })));
   const BEATS = pianoRollBeats;
   const [snapTo, setSnapTo] = useState(0.25);
   const [noteDuration, setNoteDuration] = useState(0.25);

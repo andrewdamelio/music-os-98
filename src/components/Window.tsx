@@ -1,5 +1,6 @@
-import { useRef, useCallback, type ReactNode } from 'react';
+import { memo, useRef, useCallback, type ReactNode } from 'react';
 import { useOSStore, type WindowState } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 interface Props {
   win: WindowState;
@@ -8,8 +9,14 @@ interface Props {
   menuItems?: { label: string; items?: { label: string; action: () => void }[] }[];
 }
 
-export default function Window({ win, children, icon, menuItems }: Props) {
-  const { focusWindow, closeWindow, minimizeWindow, maximizeWindow, moveWindow, focusedWindowId } = useOSStore();
+function Window({ win, children, icon, menuItems }: Props) {
+  const { focusWindow, closeWindow, minimizeWindow, maximizeWindow, moveWindow } =
+    useOSStore(useShallow(s => ({
+      focusWindow: s.focusWindow, closeWindow: s.closeWindow,
+      minimizeWindow: s.minimizeWindow, maximizeWindow: s.maximizeWindow,
+      moveWindow: s.moveWindow,
+    })));
+  const focusedWindowId = useOSStore(s => s.focusedWindowId);
   const isFocused = focusedWindowId === win.instanceId;
   const dragRef = useRef<{ startX: number; startY: number; winX: number; winY: number } | null>(null);
 
@@ -119,3 +126,5 @@ export default function Window({ win, children, icon, menuItems }: Props) {
     </div>
   );
 }
+
+export default memo(Window);

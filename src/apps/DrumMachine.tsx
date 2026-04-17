@@ -1,4 +1,6 @@
 import { useOSStore } from '../store';
+import { usePlaybackStore } from '../store/playback';
+import { useShallow } from 'zustand/react/shallow';
 import { DRUM_CHANNELS } from '../audio/engine';
 import { audioEngine } from '../audio/engine';
 
@@ -90,13 +92,23 @@ function ChromeKnob({ value, min, max, onChange, color = '#00e5ff', label, displ
 export default function DrumMachine() {
   const {
     drumPattern, drumStepCount, drumSwing, currentPatternIdx,
-    currentStep, isPlaying,
+    isPlaying,
     toggleDrumStep, clearDrumPattern, loadDefaultPattern,
     randomizeDrumPattern, copyDrumPattern, pasteDrumPattern,
     drumChannelGains, setDrumChannelGain,
     bpm, setBPM,
     setDrumSwing, setDrumStepCount, selectPattern,
-  } = useOSStore();
+  } = useOSStore(useShallow(s => ({
+    drumPattern: s.drumPattern, drumStepCount: s.drumStepCount, drumSwing: s.drumSwing,
+    currentPatternIdx: s.currentPatternIdx, isPlaying: s.isPlaying,
+    toggleDrumStep: s.toggleDrumStep, clearDrumPattern: s.clearDrumPattern,
+    loadDefaultPattern: s.loadDefaultPattern, randomizeDrumPattern: s.randomizeDrumPattern,
+    copyDrumPattern: s.copyDrumPattern, pasteDrumPattern: s.pasteDrumPattern,
+    drumChannelGains: s.drumChannelGains, setDrumChannelGain: s.setDrumChannelGain,
+    bpm: s.bpm, setBPM: s.setBPM,
+    setDrumSwing: s.setDrumSwing, setDrumStepCount: s.setDrumStepCount, selectPattern: s.selectPattern,
+  })));
+  const currentStep = usePlaybackStore(s => s.currentStep);
 
   const handlePreviewDrum = (channel: number) => {
     audioEngine.ensureRunning(() => {

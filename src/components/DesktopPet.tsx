@@ -3,6 +3,7 @@
 // Special events inspired by lwu309/Scmpoo + eSheep64 XML animations
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useOSStore } from '../store';
 import sheepSprite from '../assets/esheep64.png';
 import scmpoo110 from '../assets/scmpoo110.png';
 import scmpoo111 from '../assets/scmpoo111.png';
@@ -319,6 +320,13 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
   const dragRef = useRef(false);
   const dragOffRef = useRef({ x: 0, y: 0 });
   const velHistRef = useRef<{ x: number; y: number }[]>([]);
+  // Instance id of the active window the sheep is currently standing on (null = floor).
+  // Sheep detaches and falls if the window loses focus, is minimized, moves out from
+  // under it, or the sheep walks off its horizontal edge.
+  const platformWindowIdRef = useRef<string | null>(null);
+  // Tracks which edge of the current platform window we've already rolled the
+  // turn-around decision for, so we don't re-roll every frame while near it.
+  const edgeDecisionRef = useRef<'left' | 'right' | null>(null);
 
   // ── Flower refs ─────────────────────────────────────────────────────────
   const flowerRef = useRef<{ x: number; y: number; frame: number } | null>(null);
@@ -579,8 +587,9 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
     const H = window.innerHeight - 40;
 
     // ── Drag ──────────────────────────────────────────────────────────────
+    // onMove handles setDisplayPos directly; skipping it here avoids double
+    // React re-renders per frame during drag (mousemove + RAF both firing).
     if (dragRef.current) {
-      setDisplayPos({ ...pos });
       return;
     }
 
@@ -850,31 +859,135 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
     pos.x += vel.x;
     pos.y += vel.y;
 
-    // ── Floor collision ───────────────────────────────────────────────────
+    // ── Floor / active-window platform collision ─────────────────────────
+    // The sheep can land and walk on top of the currently focused (active) app
+    // window. It falls off if the window loses focus, is minimized, gets maximized,
+    // moves out from under it, or the sheep walks off the horizontal edge.
     const isClimbing = ['climb_up', 'top_walk', 'climb_down', 'climb_prep', 'ufo_caught'].includes(stateRef.current);
-    if (!isClimbing && pos.y >= H - RENDER_H) {
-      pos.y = H - RENDER_H;
-      vel.y = 0;
-      if (stateRef.current === 'fall' || stateRef.current === 'drag') {
-        vel.x = 0;
-        stateRef.current = 'idle';
-        frameIdxRef.current = 0;
-        loopCycleRef.current = 0;
-      } else if (stateRef.current === 'burn') {
-        // Sheep lands — spawn the bathtub prop to douse the fire
-        vel.x = 0;
-        stateRef.current = 'idle';
-        frameIdxRef.current = 0;
-        loopCycleRef.current = 0;
-        const btX = Math.max(0, Math.min(W - S_FW - 4, pos.x - S_FW / 4));
-        const btY = H - S_FH;
-        bathtubPropRef.current = { x: btX, y: btY, frame: 3, startTs: ts, splash: true };
-        setBathtubProp({ x: btX, y: btY, frame: 3 });
-        // Hide the sheep while the splash animation plays — it re-appears once the prop clears.
-        // The ref also freezes state transitions so idle.next() doesn't pick sit/yawn/etc
-        // during the splash (which would then show when the sheep reappears).
-        splashHideRef.current = true;
-        setSplashHideSheep(true);
+    if (!isClimbing) {
+      const os = useOSStore.getState();
+      const focusedId = os.focusedWindowId;
+      const activeWin = focusedId
+        ? os.windows.find(w => w.instanceId === focusedId && !w.minimized && !w.maximized) ?? null
+        : null;
+      // Edge-turnaround: when the sheep is on a platform and approaching one of its
+      // edges, 85% turn back, 15% walk off. The decision ref only STICKS on the 15%
+      // commit — the 85% path intentionally leaves the ref null so that if a state
+      // transition later in the same frame flips vel.x back toward the edge, the
+      // next frame re-rolls instead of falling through. Uses foot position for
+      // both detection and the pull-back clamp.
+      if (platformWindowIdRef.current && activeWin && activeWin.instanceId === platformWindowIdRef.current) {
+        const EDGE_BUF = 10;
+        const sheepLeft  = pos.x;
+        const sheepRight = pos.x + RENDER_W;
+        const nearLeft  = sheepLeft  <= activeWin.x + EDGE_BUF;
+        const nearRight = sheepRight >= activeWin.x + activeWin.w - EDGE_BUF;
+        const approachLeft  = vel.x < 0 && nearLeft;
+        const approachRight = vel.x > 0 && nearRight;
+
+        if (!nearLeft && !nearRight) {
+          edgeDecisionRef.current = null;
+        }
+        if (approachLeft && edgeDecisionRef.current !== 'left') {
+          if (Math.random() < 0.85) {
+            // Turn around — flip direction and nudge back inside the buffer.
+            vel.x = Math.abs(vel.x) || 0.3;
+            dirRef.current = 1;
+            pos.x = Math.max(pos.x, activeWin.x + 1);
+            // Don't stick the decision — let future frames re-roll freely.
+          } else {
+            edgeDecisionRef.current = 'left';
+          }
+        } else if (approachRight && edgeDecisionRef.current !== 'right') {
+          if (Math.random() < 0.85) {
+            vel.x = -(Math.abs(vel.x) || 0.3);
+            dirRef.current = -1;
+            pos.x = Math.min(pos.x, activeWin.x + activeWin.w - RENDER_W - 1);
+          } else {
+            edgeDecisionRef.current = 'right';
+          }
+        }
+      }
+
+      const sheepCenter = pos.x + RENDER_W / 2;
+      const overActive = !!activeWin && sheepCenter >= activeWin.x && sheepCenter <= activeWin.x + activeWin.w;
+
+      // Detachment: if we were standing on a window that's no longer valid, fall.
+      if (platformWindowIdRef.current) {
+        const stillAttached = overActive && activeWin!.instanceId === platformWindowIdRef.current;
+        if (!stillAttached) {
+          platformWindowIdRef.current = null;
+          edgeDecisionRef.current = null;
+          if (stateRef.current !== 'drag' && stateRef.current !== 'burn') {
+            // If we were mid poo_* companion animation, cancel it so the overlay
+            // doesn't linger at the old position while the sheep falls.
+            if (['poo_sleep', 'poo_sit', 'poo_yawn', 'poo_roll'].includes(stateRef.current)) {
+              pooRef.current = null;
+              setPooDisplay(null);
+            }
+            stateRef.current = 'fall';
+            frameIdxRef.current = 0;
+          }
+        } else {
+          // Ride the window — snap y to its top each frame so it tracks a moving window.
+          pos.y = activeWin!.y - RENDER_H;
+          if (vel.y > 0) vel.y = 0;
+          // Safety: if state got stuck as 'fall' while still attached (e.g. after a
+          // drag-release that didn't retrigger the landing path), settle into idle.
+          if (stateRef.current === 'fall') {
+            vel.x = 0;
+            stateRef.current = 'idle';
+            frameIdxRef.current = 0;
+            loopCycleRef.current = 0;
+          }
+        }
+      } else {
+        edgeDecisionRef.current = null;
+      }
+
+      // Landing: either on a window (crossed its top this frame while falling) or on the floor.
+      if (!platformWindowIdRef.current) {
+        const prevBottom = (pos.y - vel.y) + RENDER_H;
+        const curBottom = pos.y + RENDER_H;
+        const landedOnWin =
+          activeWin && overActive && stateRef.current !== 'burn'
+          && vel.y > 0 && prevBottom <= activeWin.y && curBottom >= activeWin.y;
+
+        if (landedOnWin) {
+          pos.y = activeWin!.y - RENDER_H;
+          vel.y = 0;
+          platformWindowIdRef.current = activeWin!.instanceId;
+          if (stateRef.current === 'fall' || stateRef.current === 'drag') {
+            vel.x = 0;
+            stateRef.current = 'idle';
+            frameIdxRef.current = 0;
+            loopCycleRef.current = 0;
+          }
+        } else if (pos.y >= H - RENDER_H) {
+          pos.y = H - RENDER_H;
+          vel.y = 0;
+          if (stateRef.current === 'fall' || stateRef.current === 'drag') {
+            vel.x = 0;
+            stateRef.current = 'idle';
+            frameIdxRef.current = 0;
+            loopCycleRef.current = 0;
+          } else if (stateRef.current === 'burn') {
+            // Sheep lands — spawn the bathtub prop to douse the fire
+            vel.x = 0;
+            stateRef.current = 'idle';
+            frameIdxRef.current = 0;
+            loopCycleRef.current = 0;
+            const btX = Math.max(0, Math.min(W - S_FW - 4, pos.x - S_FW / 4));
+            const btY = H - S_FH;
+            bathtubPropRef.current = { x: btX, y: btY, frame: 3, startTs: ts, splash: true };
+            setBathtubProp({ x: btX, y: btY, frame: 3 });
+            // Hide the sheep while the splash animation plays — it re-appears once the prop clears.
+            // The ref also freezes state transitions so idle.next() doesn't pick sit/yawn/etc
+            // during the splash (which would then show when the sheep reappears).
+            splashHideRef.current = true;
+            setSplashHideSheep(true);
+          }
+        }
       }
     }
 
@@ -882,6 +995,11 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
     if (!isClimbing && stateRef.current !== 'burn') {
       if (pos.x < 0) { pos.x = 0; vel.x = Math.abs(vel.x); dirRef.current = 1; }
       if (pos.x > W - RENDER_W) { pos.x = W - RENDER_W; vel.x = -Math.abs(vel.x); dirRef.current = -1; }
+      // Ceiling: allow a generous overshoot for hard upward throws (about one
+      // full viewport above the screen) but cap it so the sheep can't drift to
+      // infinity if it ever ends up with a huge negative vy.
+      const CEILING = -window.innerHeight;
+      if (pos.y < CEILING) { pos.y = CEILING; if (vel.y < 0) vel.y = 0; }
     }
 
     // ── Animate frames ────────────────────────────────────────────────────
@@ -1011,16 +1129,25 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
     return () => clearTimeout(t);
   }, [visible, triggerSpecialEvent]);
 
-  // ── Drag handler ─────────────────────────────────────────────────────────
+  // ── Drag / click handler ─────────────────────────────────────────────────
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    // Remember the pre-drag state so a pure click can resume it unchanged.
+    const prevState = stateRef.current;
+    const prevFrameIdx = frameIdxRef.current;
     dragRef.current = true;
     stateRef.current = 'drag';
     frameIdxRef.current = 0;
     velHistRef.current = [];
     setFlipY(false);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let movedFar = false;
     dragOffRef.current = { x: e.clientX - posRef.current.x, y: e.clientY - posRef.current.y };
     const onMove = (me: MouseEvent) => {
+      if (!movedFar && (Math.abs(me.clientX - startX) > 3 || Math.abs(me.clientY - startY) > 3)) {
+        movedFar = true;
+      }
       const nx = me.clientX - dragOffRef.current.x;
       const ny = me.clientY - dragOffRef.current.y;
       velHistRef.current.push({ x: nx - posRef.current.x, y: ny - posRef.current.y });
@@ -1030,13 +1157,24 @@ export default function DesktopPet({ visible }: DesktopPetProps) {
     };
     const onUp = () => {
       dragRef.current = false;
-      if (velHistRef.current.length > 0) {
-        const avg = velHistRef.current.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y }), { x: 0, y: 0 });
-        velRef.current.x = (avg.x / velHistRef.current.length) * 0.6;
-        velRef.current.y = (avg.y / velHistRef.current.length) * 0.6;
+      if (!movedFar) {
+        // Click (no drag) — restore prior state and preserve any platform attachment.
+        stateRef.current = prevState;
+        frameIdxRef.current = prevFrameIdx;
+      } else {
+        // Drag release — throw with velocity. Handled identically whether the sheep
+        // was riding a window or on the desktop; the tick's landing logic reattaches
+        // if the sheep comes down over an active window.
+        platformWindowIdRef.current = null;
+        edgeDecisionRef.current = null;
+        if (velHistRef.current.length > 0) {
+          const avg = velHistRef.current.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y }), { x: 0, y: 0 });
+          velRef.current.x = (avg.x / velHistRef.current.length) * 0.6;
+          velRef.current.y = (avg.y / velHistRef.current.length) * 0.6;
+        }
+        stateRef.current = 'fall';
+        frameIdxRef.current = 0;
       }
-      stateRef.current = 'fall';
-      frameIdxRef.current = 0;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };

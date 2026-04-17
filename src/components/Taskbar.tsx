@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import StartMenu from './StartMenu';
 import { ICQ_STATUS_CONFIG } from '../apps/ICQ';
 
 export default function Taskbar() {
-  const { windows, focusedWindowId, openApp, minimizeWindow, restoreWindow, focusWindow, startMenuOpen, setStartMenuOpen, icqStatus } = useOSStore();
+  const { windows, focusedWindowId, openApp, minimizeWindow, restoreWindow, focusWindow, startMenuOpen, setStartMenuOpen, icqStatus } =
+    useOSStore(useShallow(s => ({
+      windows: s.windows, focusedWindowId: s.focusedWindowId,
+      openApp: s.openApp, minimizeWindow: s.minimizeWindow,
+      restoreWindow: s.restoreWindow, focusWindow: s.focusWindow,
+      startMenuOpen: s.startMenuOpen, setStartMenuOpen: s.setStartMenuOpen,
+      icqStatus: s.icqStatus,
+    })));
   const [clock, setClock] = useState('');
 
   useEffect(() => {

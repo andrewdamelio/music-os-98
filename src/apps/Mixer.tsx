@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { audioEngine } from '../audio/engine';
 
 // ── VU Meter ──────────────────────────────────────────────────────────────────
@@ -135,7 +136,9 @@ function SendKnob({ value, onChange }: { value: number; onChange: (v: number) =>
 
 // ── Channel Strip ─────────────────────────────────────────────────────────────
 function ChannelStrip({ index }: { index: number }) {
-  const { mixerChannels, updateMixerChannel } = useOSStore();
+  const { mixerChannels, updateMixerChannel } = useOSStore(useShallow(s => ({
+    mixerChannels: s.mixerChannels, updateMixerChannel: s.updateMixerChannel,
+  })));
   const ch = mixerChannels[index];
   const dragRef = useRef<{ y: number; v: number } | null>(null);
   const isMaster = index === 7;

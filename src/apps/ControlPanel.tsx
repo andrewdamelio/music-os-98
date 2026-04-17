@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { audioEngine } from '../audio/engine';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function ControlPanel() {
-  const { mixerChannels, updateMixerChannel } = useOSStore();
+  const { mixerChannels, updateMixerChannel } = useOSStore(useShallow(s => ({
+    mixerChannels: s.mixerChannels,
+    updateMixerChannel: s.updateMixerChannel,
+  })));
   const master = mixerChannels[7];
   const [muted, setMuted] = useState(master?.muted ?? false);
 

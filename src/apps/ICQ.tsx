@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type IcqStatus = 'online' | 'away' | 'dnd' | 'na' | 'offline';
@@ -279,7 +280,10 @@ function ChatWindow({
 
 // ── Main ICQ component ─────────────────────────────────────────────────────────
 export default function ICQ() {
-  const { icqStatus, setIcqStatus } = useOSStore();
+  const { icqStatus, setIcqStatus } = useOSStore(useShallow(s => ({
+    icqStatus: s.icqStatus,
+    setIcqStatus: s.setIcqStatus,
+  })));
   const [chatWins, setChatWins] = useState<ChatWin[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [showStatus, setShowStatus] = useState(false);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 function calcDelayMs(bpm: number, division: string): number {
   const divisions: Record<string, number> = {
@@ -11,7 +12,10 @@ function calcDelayMs(bpm: number, division: string): number {
 }
 
 export default function TempoCalc() {
-  const { bpm, setBPM } = useOSStore();
+  const { bpm, setBPM } = useOSStore(useShallow(s => ({
+    bpm: s.bpm,
+    setBPM: s.setBPM,
+  })));
   const [tapTimes, setTapTimes] = useState<number[]>([]);
   const [tapBPM, setTapBPM] = useState<number | null>(null);
 

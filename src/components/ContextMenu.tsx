@@ -2,7 +2,8 @@ import { useOSStore } from '../store';
 import { useEffect, useRef } from 'react';
 
 export default function ContextMenu() {
-  const { contextMenu, hideContextMenu } = useOSStore();
+  const contextMenu = useOSStore(s => s.contextMenu);
+  const hideContextMenu = useOSStore(s => s.hideContextMenu);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

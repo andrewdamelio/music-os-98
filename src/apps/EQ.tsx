@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { audioEngine } from '../audio/engine';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 const BANDS = [
   { label: 'LOW',  freq: 80,   type: 'lowshelf', color: '#ff4088' },
@@ -242,7 +243,11 @@ function BandControl({
 
 // ── EQ ────────────────────────────────────────────────────────────────────────
 export default function EQ() {
-  const { eqParams, setEQEnabled, setEQBand } = useOSStore();
+  const { eqParams, setEQEnabled, setEQBand } = useOSStore(useShallow(s => ({
+    eqParams: s.eqParams,
+    setEQEnabled: s.setEQEnabled,
+    setEQBand: s.setEQBand,
+  })));
   const { enabled, gains } = eqParams;
 
   const toggle = () => setEQEnabled(!enabled);

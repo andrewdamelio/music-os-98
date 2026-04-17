@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { audioEngine } from '../audio/engine';
 import type { SynthParams } from '../audio/engine';
 import { midiBridge } from '../audio/midi';
@@ -274,7 +275,11 @@ function PatchBrowser({ onLoad }: { onLoad: (p: Patch) => void }) {
   const [userPatches, setUserPatches] = useState<Patch[]>(loadUserPatches);
   const [saveName, setSaveName] = useState('');
   const [showSave, setShowSave] = useState(false);
-  const { synthParams, activeSynthPatch, setActiveSynthPatch } = useOSStore();
+  const { synthParams, activeSynthPatch, setActiveSynthPatch } = useOSStore(useShallow(s => ({
+    synthParams: s.synthParams,
+    activeSynthPatch: s.activeSynthPatch,
+    setActiveSynthPatch: s.setActiveSynthPatch,
+  })));
 
   const allPatches = [...FACTORY_PATCHES, ...userPatches];
   // Resolve activeName: use store value if it exists in patch list, else fall back to first patch
@@ -387,7 +392,10 @@ function PatchBrowser({ onLoad }: { onLoad: (p: Patch) => void }) {
 // ── Synth ────────────────────────────────────────────────────────────────────
 
 export default function Synth() {
-  const { synthParams, updateSynthParam } = useOSStore();
+  const { synthParams, updateSynthParam } = useOSStore(useShallow(s => ({
+    synthParams: s.synthParams,
+    updateSynthParam: s.updateSynthParam,
+  })));
   const [pressedKeys, setPressedKeys] = useState<Set<number>>(new Set());
   const [octaveShift, setOctaveShift] = useState(0);
   const [midiOn, setMidiOn] = useState(false);

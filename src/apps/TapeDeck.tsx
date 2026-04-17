@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 // ── Reel SVG ──────────────────────────────────────────────────────────────────
 function Reel({ angle, size = 54, filled = 0.5 }: { angle: number; size?: number; filled?: number }) {
@@ -134,7 +135,11 @@ function Cassette({ reelAngle, isRecording, projectName, takeNum }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function TapeDeck() {
-  const { isRecording, toggleRecord, projectName } = useOSStore();
+  const { isRecording, toggleRecord, projectName } = useOSStore(useShallow(s => ({
+    isRecording: s.isRecording,
+    toggleRecord: s.toggleRecord,
+    projectName: s.projectName,
+  })));
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordings, setRecordings] = useState<{ name: string; url: string; duration: number }[]>([]);
   const [playingUrl, setPlayingUrl] = useState<string | null>(null);

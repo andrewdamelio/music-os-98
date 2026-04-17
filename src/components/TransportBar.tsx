@@ -1,10 +1,21 @@
 import { useOSStore } from '../store';
+import { usePlaybackStore } from '../store/playback';
+import { useShallow } from 'zustand/react/shallow';
 import { useEffect, useRef, useState } from 'react';
 
 export default function TransportBar() {
-  const { isPlaying, bpm, currentStep, loopEnabled, isRecording, projectName, drumStepCount,
+  const { isPlaying, bpm, loopEnabled, isRecording, projectName, drumStepCount,
     metronomeEnabled, toggleMetronome,
-    play, stop, setBPM, toggleLoop, toggleRecord, saveProject, loadProjectFromJSON, setProjectName } = useOSStore();
+    play, stop, setBPM, toggleLoop, toggleRecord, saveProject, loadProjectFromJSON, setProjectName } =
+    useOSStore(useShallow(s => ({
+      isPlaying: s.isPlaying, bpm: s.bpm, loopEnabled: s.loopEnabled,
+      isRecording: s.isRecording, projectName: s.projectName, drumStepCount: s.drumStepCount,
+      metronomeEnabled: s.metronomeEnabled, toggleMetronome: s.toggleMetronome,
+      play: s.play, stop: s.stop, setBPM: s.setBPM, toggleLoop: s.toggleLoop,
+      toggleRecord: s.toggleRecord, saveProject: s.saveProject,
+      loadProjectFromJSON: s.loadProjectFromJSON, setProjectName: s.setProjectName,
+    })));
+  const currentStep = usePlaybackStore(s => s.currentStep);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingBpm, setEditingBpm] = useState(false);
   const [bpmInput, setBpmInput] = useState(String(bpm));

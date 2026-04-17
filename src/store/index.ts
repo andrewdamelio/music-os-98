@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { audioEngine, DRUM_CHANNELS, type DrumChannel, type FXParams, type SynthParams } from '../audio/engine';
+import { usePlaybackStore } from './playback';
 
 export interface AppDef {
   id: string;
@@ -188,7 +189,6 @@ interface OSStore {
   // Transport
   isPlaying: boolean;
   bpm: number;
-  currentStep: number;
   loopEnabled: boolean;
   isRecording: boolean;
   projectName: string;
@@ -196,7 +196,6 @@ interface OSStore {
   play: () => void;
   stop: () => void;
   setBPM: (bpm: number) => void;
-  setCurrentStep: (step: number) => void;
   toggleLoop: () => void;
   toggleRecord: () => void;
   toggleMetronome: () => void;
@@ -385,7 +384,6 @@ export const useOSStore = create<OSStore>((set, get) => ({
   // Transport
   isPlaying: false,
   bpm: 128,
-  currentStep: -1,
   loopEnabled: true,
   isRecording: false,
   projectName: 'Untitled Project',
@@ -398,14 +396,15 @@ export const useOSStore = create<OSStore>((set, get) => ({
     set({ isPlaying: true });
     if (stepUnsub) stepUnsub();
     stepUnsub = audioEngine.onStep((step) => {
-      set({ currentStep: step });
+      usePlaybackStore.getState().setCurrentStep(step);
     });
   },
 
   stop: () => {
     if (stepUnsub) { stepUnsub(); stepUnsub = null; }
     audioEngine.stop();
-    set({ isPlaying: false, currentStep: -1 });
+    set({ isPlaying: false });
+    usePlaybackStore.getState().setCurrentStep(-1);
   },
 
   setBPM: (bpm) => {
@@ -413,7 +412,6 @@ export const useOSStore = create<OSStore>((set, get) => ({
     set({ bpm });
   },
 
-  setCurrentStep: (step) => set({ currentStep: step }),
   toggleLoop: () => set(s => ({ loopEnabled: !s.loopEnabled })),
   toggleMetronome: () => {
     const next = !get().metronomeEnabled;

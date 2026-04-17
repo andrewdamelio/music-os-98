@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 // ── Knob ─────────────────────────────────────────────────────────────────────
 
@@ -443,7 +444,9 @@ function SegDisplay({ value, color, unit }: { value: string; color: string; unit
 // ── FX Rack ───────────────────────────────────────────────────────────────────
 
 export default function FXRack() {
-  const { fxParams, updateFX } = useOSStore();
+  const { fxParams, updateFX } = useOSStore(useShallow(s => ({
+    fxParams: s.fxParams, updateFX: s.updateFX,
+  })));
   const p = fxParams;
 
   return (

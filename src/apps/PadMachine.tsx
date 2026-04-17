@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { audioEngine } from '../audio/engine';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { addUserSample, getUserSampleNames, subscribeUserSamples, userSampleBuffers } from '../store/userSamples';
 
 // ── Module-level state — survives component unmount ───────────────────────────
@@ -139,7 +140,10 @@ function makePad(idx: number): PadState {
 // ── PadMachine ────────────────────────────────────────────────────────────────
 
 export default function PadMachine() {
-  const { padAssignments, updatePadAssignment } = useOSStore();
+  const { padAssignments, updatePadAssignment } = useOSStore(useShallow(s => ({
+    padAssignments: s.padAssignments,
+    updatePadAssignment: s.updatePadAssignment,
+  })));
 
   // Init pads from store assignments (buffers are loaded async below)
   const [pads, setPads] = useState<PadState[]>(() =>

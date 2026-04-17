@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { audioEngine } from '../audio/engine';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 // ── Knob ──────────────────────────────────────────────────────────────────────
 interface KnobProps {
@@ -139,7 +140,10 @@ function GRMeter() {
 
 // ── Compressor ────────────────────────────────────────────────────────────────
 export default function Compressor() {
-  const { compParams, setCompParam } = useOSStore();
+  const { compParams, setCompParam } = useOSStore(useShallow(s => ({
+    compParams: s.compParams,
+    setCompParam: s.setCompParam,
+  })));
   const { enabled, threshold, ratio, attack, release, knee, makeup } = compParams;
 
   const toggle = () => setCompParam('enabled', !enabled);

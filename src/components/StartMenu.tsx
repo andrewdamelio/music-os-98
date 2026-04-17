@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useOSStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 interface AppItem {
   label: string;
@@ -86,7 +87,9 @@ const MENU: TopItem[] = [
 ];
 
 export default function StartMenu() {
-  const { openApp, setStartMenuOpen } = useOSStore();
+  const { openApp, setStartMenuOpen } = useOSStore(useShallow(s => ({
+    openApp: s.openApp, setStartMenuOpen: s.setStartMenuOpen,
+  })));
   const [openCategory, setOpenCategory] = useState<string | null>(null);
 
   const close = () => {
